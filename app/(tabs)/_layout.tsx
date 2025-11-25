@@ -1,0 +1,43 @@
+import { Tabs } from 'expo-router';
+import { Home, Camera, Plus } from 'lucide-react-native';
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#2D6A4F',
+        tabBarInactiveTintColor: '#95A99C',
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E8F5E9',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ size, color }) => <Home size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ingredients"
+        options={{
+          title: 'Add Ingredients',
+          tabBarIcon: ({ size, color }) => <Plus size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="camera"
+        options={{
+          title: 'AI Camera',
+          tabBarIcon: ({ size, color }) => <Camera size={size} color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}
