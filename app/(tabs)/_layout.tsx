@@ -1,5 +1,6 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Camera, Plus } from 'lucide-react-native';
+import { Home, Camera, Plus, UtensilsCrossed } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -36,6 +37,13 @@ export default function TabLayout() {
         options={{
           title: 'AI Camera',
           tabBarIcon: ({ size, color }) => <Camera size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="recommendations"
+        options={{
+          title: 'Dishes',
+          tabBarIcon: ({ size, color }) => <UtensilsCrossed size={size} color={color} />,
         }}
       />
     </Tabs>
