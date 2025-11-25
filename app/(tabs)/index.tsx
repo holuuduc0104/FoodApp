@@ -1,23 +1,14 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Plus, Camera, ChefHat, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useIngredients } from '@/context/IngredientsContext';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [ingredients, setIngredients] = useState([
-    'Chicken Breast',
-    'Tomatoes',
-    'Onions',
-    'Garlic',
-    'Rice',
-    'Bell Peppers',
-    'Olive Oil',
-    'Spinach',
-  ]);
+  const { ingredients, removeIngredient } = useIngredients();
 
-  const removeIngredient = (index: number) => {
-    setIngredients(ingredients.filter((_, i) => i !== index));
+  const handleRemoveIngredient = (id: string) => {
+    removeIngredient(id);
   };
 
   return (
@@ -41,11 +32,11 @@ export default function HomeScreen() {
 
           {ingredients.length > 0 ? (
             <View style={styles.ingredientsList}>
-              {ingredients.map((ingredient, index) => (
-                <View key={index} style={styles.ingredientChip}>
-                  <Text style={styles.ingredientText}>{ingredient}</Text>
+              {ingredients.map((ingredient) => (
+                <View key={ingredient.id} style={styles.ingredientChip}>
+                  <Text style={styles.ingredientText}>{ingredient.name}</Text>
                   <TouchableOpacity
-                    onPress={() => removeIngredient(index)}
+                    onPress={() => handleRemoveIngredient(ingredient.id)}
                     style={styles.removeButton}>
                     <X size={16} color="#2D6A4F" />
                   </TouchableOpacity>
