@@ -38,3 +38,11 @@ yarn-error.*
 .idea/
 *.iml
 .vscode/
+
+# Python Backend
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/.pytest_cache/
+backend/routers/__pycache__/
