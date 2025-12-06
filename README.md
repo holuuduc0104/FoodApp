@@ -107,6 +107,7 @@ Then:
 - ✅ **Smart Recommendations** - Get meal suggestions based on available ingredients
 - ✅ **Recipe Search** - Find recipes by name
 - ✅ **User Authentication** - Sign up / Sign in
+- ✅ **News & Events** - View articles, events, and food news
 - ⏳ **Favorites** - Save favorite recipes (Coming soon)
 
 ## 🛠 Tech Stack
@@ -140,6 +141,11 @@ Then:
 - `GET /api/recipes/recommendations` - Get recommended recipes
 - `GET /api/recipes/search` - Search recipes
 - `GET /api/recipes/{id}` - Get recipe details
+
+### Articles (News & Events)
+- `GET /api/articles/` - Get all articles
+- `GET /api/articles/featured` - Get featured articles
+- `GET /api/articles/{id}` - Get article details
 
 ## 🗄 Database Schema (Supabase)
 

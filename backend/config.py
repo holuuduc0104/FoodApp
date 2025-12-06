@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
+
+# Get the directory where config.py is located
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
@@ -17,7 +21,7 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:8081"
     
     class Config:
-        env_file = ".env"
+        env_file = str(BASE_DIR / ".env")
         case_sensitive = False
 
 
