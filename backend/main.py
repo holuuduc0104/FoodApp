@@ -38,11 +38,12 @@ async def health_check():
 
 
 # Import routers
-from routers import auth, ingredients, recipes
+from routers import auth, ingredients, recipes, articles
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(ingredients.router, prefix="/api/ingredients", tags=["Ingredients"])
 app.include_router(recipes.router, prefix="/api/recipes", tags=["Recipes"])
+app.include_router(articles.router, prefix="/api/articles", tags=["Articles"])
 
 
 if __name__ == "__main__":

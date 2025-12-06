@@ -65,3 +65,63 @@ INSERT INTO public.recipes (name, description, ingredients, instructions, cookin
 ('Beef Tacos', 'Mexican beef tacos', ARRAY['Beef', 'Tortilla', 'Lettuce', 'Tomato', 'Cheese', 'Onion'],
  '1. Cook ground beef\n2. Season with spices\n3. Warm tortillas\n4. Fill with beef\n5. Add toppings\n6. Serve hot',
  20, 'Easy', 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b');
+
+-- Create articles table for news, events, blog posts
+CREATE TABLE IF NOT EXISTS public.articles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    description TEXT,
+    content TEXT,
+    image_url TEXT,
+    category TEXT NOT NULL DEFAULT 'news', -- 'article', 'event', 'news'
+    read_time TEXT,
+    featured BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS for articles
+ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for articles (public read)
+CREATE POLICY "Anyone can view articles"
+    ON public.articles FOR SELECT
+    USING (true);
+
+-- Insert sample articles
+INSERT INTO public.articles (title, description, content, image_url, category, read_time, featured) VALUES
+('10 Món Ăn Healthy Cho Mùa Hè', 
+ 'Khám phá những món ăn thanh mát, bổ dưỡng giúp bạn giải nhiệt trong những ngày hè nóng bức.',
+ 'Mùa hè nóng bức là thời điểm lý tưởng để thưởng thức những món ăn thanh mát, nhẹ nhàng...',
+ 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop',
+ 'article', '5 phút', true),
+
+('Sự Kiện Ẩm Thực Đường Phố 2025',
+ 'Tham gia sự kiện ẩm thực đường phố lớn nhất năm tại TP.HCM với hơn 100 gian hàng.',
+ 'Sự kiện ẩm thực đường phố lớn nhất năm sẽ diễn ra vào ngày 15/12/2025...',
+ 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&h=400&fit=crop',
+ 'event', '3 phút', true),
+
+('Bí Quyết Nấu Phở Ngon Chuẩn Vị',
+ 'Học cách nấu phở bò thơm ngon với công thức gia truyền từ đầu bếp chuyên nghiệp.',
+ 'Phở là món ăn truyền thống của Việt Nam được yêu thích trên toàn thế giới...',
+ 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&h=400&fit=crop',
+ 'news', '8 phút', false),
+
+('Xu Hướng Ẩm Thực 2025',
+ 'Những xu hướng ẩm thực mới nhất đang được giới trẻ yêu thích trong năm 2025.',
+ 'Năm 2025 chứng kiến sự bùng nổ của nhiều xu hướng ẩm thực mới...',
+ 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=400&fit=crop',
+ 'news', '6 phút', false),
+
+('Workshop: Làm Bánh Mì Việt Nam',
+ 'Đăng ký ngay workshop học làm bánh mì Việt Nam với nguyên liệu tươi ngon.',
+ 'Tham gia workshop đặc biệt để học cách làm bánh mì Việt Nam chuẩn vị...',
+ 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=400&fit=crop',
+ 'event', '2 phút', false),
+
+('Dinh Dưỡng Cho Người Tập Gym',
+ 'Chế độ ăn khoa học giúp tăng cơ, giảm mỡ hiệu quả cho người tập gym.',
+ 'Để đạt được kết quả tốt nhất khi tập gym, chế độ ăn uống đóng vai trò quan trọng...',
+ 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop',
+ 'article', '7 phút', false);
