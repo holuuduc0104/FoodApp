@@ -6,11 +6,15 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useIngredients } from '@/context/IngredientsContext';
-import { Camera, Rotate3D, Sparkles } from 'lucide-react-native';
+import { Camera, Rotate3D, Sparkles, Image as ImageIcon } from 'lucide-react-native';
+import { analyzeFoodImage, detectIngredients } from '@/services/api';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,7 +36,9 @@ export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [detectedItems, setDetectedItems] = useState<string[]>([]);
   const [isDetecting, setIsDetecting] = useState(false);
-  const cameraRef = useRef(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const cameraRef = useRef<any>(null);
   const { addIngredient } = useIngredients();
 
   if (!permission) {
@@ -58,27 +64,75 @@ export default function CameraScreen() {
     );
   }
 
-  const handleDetectIngredients = () => {
-    setIsDetecting(true);
+  const handleTakePhoto = async () => {
+    if (!cameraRef.current) return;
+    
+    try {
+      setIsDetecting(true);
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+      });
+      
+      await analyzeImage(photo.uri);
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Lỗi', 'Không thể chụp ảnh. Vui lòng thử lại.');
+    } finally {
+      setIsDetecting(false);
+    }
+  };
 
-    setTimeout(() => {
-      const randomCount = Math.floor(Math.random() * 3) + 2;
-      const shuffled = [...MOCK_INGREDIENTS].sort(() => 0.5 - Math.random());
-      const detected = shuffled.slice(0, randomCount);
-
-      detected.forEach((ingredient) => {
-        addIngredient(ingredient);
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
       });
 
-      setDetectedItems(detected);
-      setIsDetecting(false);
+      if (!result.canceled && result.assets[0]) {
+        await analyzeImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+    }
+  };
 
-      Alert.alert(
-        'Detection Complete',
-        `Found: ${detected.join(', ')}\n\nAdded to your ingredients!`,
-        [{ text: 'OK' }]
-      );
-    }, 1500);
+  const analyzeImage = async (imageUri: string) => {
+    try {
+      setIsAnalyzing(true);
+      setAnalysisResult(null);
+      
+      const response = await analyzeFoodImage(imageUri);
+      
+      if (response.success && response.data) {
+        if (response.data.error) {
+          Alert.alert('Thông báo', response.data.error + '\n' + (response.data.suggestion || ''));
+        } else {
+          setAnalysisResult(response.data);
+          
+          // Add ingredients to context
+          if (response.data.ingredients) {
+            response.data.ingredients.forEach((ing) => {
+              addIngredient(ing.name);
+            });
+          }
+          
+          Alert.alert(
+            'Phân tích thành công!',
+            `Món ăn: ${response.data.dish_name}\n\nĐã thêm ${response.data.ingredients?.length || 0} nguyên liệu vào danh sách của bạn.`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      Alert.alert('Lỗi', 'Không thể phân tích ảnh. Vui lòng kiểm tra kết nối mạng và thử lại.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const toggleCameraFacing = () => {
@@ -104,37 +158,60 @@ export default function CameraScreen() {
       </View>
 
       <View style={styles.bottomContainer}>
-        {detectedItems.length > 0 && (
-          <View style={styles.detectedSection}>
-            <Text style={styles.detectedLabel}>Last Detection:</Text>
-            <View style={styles.detectedTags}>
-              {detectedItems.map((item, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{item}</Text>
-                </View>
-              ))}
-            </View>
+        {isAnalyzing && (
+          <View style={styles.analyzingSection}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.analyzingText}>Đang phân tích ảnh với AI...</Text>
           </View>
+        )}
+
+        {analysisResult && !isAnalyzing && (
+          <ScrollView style={styles.resultSection} showsVerticalScrollIndicator={false}>
+            <Text style={styles.resultTitle}>{analysisResult.dish_name}</Text>
+            {analysisResult.description && (
+              <Text style={styles.resultDescription}>{analysisResult.description}</Text>
+            )}
+            
+            {analysisResult.ingredients && (
+              <View style={styles.ingredientsSection}>
+                <Text style={styles.sectionTitle}>Nguyên liệu:</Text>
+                {analysisResult.ingredients.map((ing: any, index: number) => (
+                  <Text key={index} style={styles.ingredientItem}>
+                    • {ing.name}: {ing.quantity} {ing.unit}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </ScrollView>
         )}
 
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.flipButton}
-            onPress={toggleCameraFacing}>
+            onPress={toggleCameraFacing}
+            disabled={isDetecting || isAnalyzing}>
             <Rotate3D size={20} color="#4CAF50" />
-            <Text style={styles.flipButtonText}>Flip</Text>
+            <Text style={styles.flipButtonText}>Lật</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pickButton}
+            onPress={handlePickImage}
+            disabled={isDetecting || isAnalyzing}>
+            <ImageIcon size={20} color="#4CAF50" />
+            <Text style={styles.pickButtonText}>Chọn ảnh</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.detectButton,
-              isDetecting && styles.detectButtonDisabled,
+              (isDetecting || isAnalyzing) && styles.detectButtonDisabled,
             ]}
-            onPress={handleDetectIngredients}
-            disabled={isDetecting}>
-            <Sparkles size={20} color="#FFFFFF" />
+            onPress={handleTakePhoto}
+            disabled={isDetecting || isAnalyzing}>
+            <Camera size={20} color="#FFFFFF" />
             <Text style={styles.detectButtonText}>
-              {isDetecting ? 'Detecting...' : 'Detect'}
+              {isDetecting ? 'Đang chụp...' : 'Chụp'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -273,39 +350,55 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 16,
+    maxHeight: height * 0.5,
   },
-  detectedSection: {
-    marginBottom: 20,
+  analyzingSection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginBottom: 16,
   },
-  detectedLabel: {
+  analyzingText: {
+    marginTop: 12,
     fontSize: 14,
-    fontWeight: '600',
     color: '#666666',
+    fontWeight: '500',
+  },
+  resultSection: {
+    marginBottom: 16,
+    maxHeight: height * 0.3,
+  },
+  resultTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333333',
     marginBottom: 8,
   },
-  detectedTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  resultDescription: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 12,
+    lineHeight: 20,
   },
-  tag: {
-    backgroundColor: '#E8F5E9',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
+  ingredientsSection: {
+    marginTop: 8,
   },
-  tagText: {
-    color: '#2E7D32',
-    fontSize: 12,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  ingredientItem: {
+    fontSize: 14,
+    color: '#555555',
+    marginBottom: 4,
+    lineHeight: 20,
   },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
   },
   flipButton: {
     flex: 1,
@@ -313,33 +406,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#4CAF50',
-    gap: 8,
+    gap: 4,
   },
   flipButtonText: {
     color: '#4CAF50',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pickButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    gap: 4,
+  },
+  pickButtonText: {
+    color: '#4CAF50',
+    fontSize: 12,
     fontWeight: '600',
   },
   detectButton: {
-    flex: 1.5,
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4CAF50',
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
-    gap: 8,
+    gap: 4,
   },
   detectButtonDisabled: {
     opacity: 0.6,
   },
   detectButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
   },
 });
