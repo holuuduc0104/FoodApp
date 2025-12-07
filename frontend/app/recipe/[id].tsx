@@ -1,204 +1,56 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Clock, Users, ChefHat, Flame, Heart } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
+const API_URL = 'http://192.168.1.30:8000'; // Update with your backend IP
 
-// Mock recipe detail data
-const mockRecipeDetails: Record<string, {
+type Recipe = {
   id: string;
-  title: string;
-  image: string;
-  cookTime: string;
-  servings: number;
-  difficulty: string;
-  calories: number;
+  name: string;
+  image_url: string;
   description: string;
+  cookings_time: number;
+  servings: number;
+  calories: number;
+  difficulty: string;
   ingredients: string[];
   instructions: string[];
-}> = {
-  '1': {
-    id: '1',
-    title: 'Spaghetti Carbonara',
-    image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800&h=600&fit=crop',
-    cookTime: '30 min',
-    servings: 4,
-    difficulty: 'Medium',
-    calories: 450,
-    description: 'A classic Italian pasta dish made with eggs, cheese, pancetta, and pepper. Creamy, rich, and absolutely delicious.',
-    ingredients: [
-      '400g spaghetti',
-      '200g pancetta or guanciale',
-      '4 large egg yolks',
-      '100g Pecorino Romano cheese',
-      '50g Parmesan cheese',
-      'Freshly ground black pepper',
-      'Salt to taste',
-    ],
-    instructions: [
-      'Bring a large pot of salted water to boil and cook spaghetti according to package directions.',
-      'While pasta cooks, cut pancetta into small cubes and fry in a large pan until crispy.',
-      'In a bowl, whisk together egg yolks, grated Pecorino, and Parmesan cheese.',
-      'When pasta is al dente, reserve 1 cup of pasta water, then drain.',
-      'Add hot pasta to the pancetta pan (off heat) and toss to coat.',
-      'Quickly add the egg mixture, tossing constantly. Add pasta water as needed for creaminess.',
-      'Season generously with black pepper and serve immediately.',
-    ],
-  },
-  '2': {
-    id: '2',
-    title: 'Grilled Salmon',
-    image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=800&h=600&fit=crop',
-    cookTime: '25 min',
-    servings: 2,
-    difficulty: 'Easy',
-    calories: 350,
-    description: 'Perfectly grilled salmon with a crispy skin and tender, flaky interior. Simple yet elegant.',
-    ingredients: [
-      '2 salmon fillets (6 oz each)',
-      '2 tbsp olive oil',
-      '1 lemon, sliced',
-      '2 cloves garlic, minced',
-      'Fresh dill',
-      'Salt and pepper to taste',
-    ],
-    instructions: [
-      'Preheat grill or grill pan to medium-high heat.',
-      'Pat salmon fillets dry and brush with olive oil.',
-      'Season generously with salt, pepper, and minced garlic.',
-      'Place salmon skin-side down on the grill.',
-      'Cook for 4-5 minutes per side until internal temperature reaches 145°F.',
-      'Garnish with fresh dill and lemon slices before serving.',
-    ],
-  },
-  '3': {
-    id: '3',
-    title: 'Caesar Salad',
-    image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=800&h=600&fit=crop',
-    cookTime: '15 min',
-    servings: 2,
-    difficulty: 'Easy',
-    calories: 280,
-    description: 'A timeless classic with crisp romaine lettuce, creamy Caesar dressing, crunchy croutons, and parmesan.',
-    ingredients: [
-      '1 large head romaine lettuce',
-      '1/2 cup Caesar dressing',
-      '1/2 cup croutons',
-      '1/4 cup shaved Parmesan cheese',
-      'Freshly ground black pepper',
-      'Anchovy fillets (optional)',
-    ],
-    instructions: [
-      'Wash and dry romaine lettuce, then tear into bite-sized pieces.',
-      'Place lettuce in a large salad bowl.',
-      'Add Caesar dressing and toss to coat evenly.',
-      'Top with croutons and shaved Parmesan cheese.',
-      'Add anchovy fillets if desired and season with black pepper.',
-      'Serve immediately while croutons are still crunchy.',
-    ],
-  },
-  '4': {
-    id: '4',
-    title: 'Beef Stir Fry',
-    image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&h=600&fit=crop',
-    cookTime: '20 min',
-    servings: 3,
-    difficulty: 'Medium',
-    calories: 380,
-    description: 'Quick and flavorful beef stir fry with colorful vegetables in a savory sauce.',
-    ingredients: [
-      '500g beef sirloin, sliced thin',
-      '2 cups mixed vegetables (bell peppers, broccoli, snap peas)',
-      '3 tbsp soy sauce',
-      '1 tbsp oyster sauce',
-      '2 cloves garlic, minced',
-      '1 tbsp ginger, minced',
-      '2 tbsp vegetable oil',
-    ],
-    instructions: [
-      'Slice beef against the grain into thin strips.',
-      'Mix soy sauce and oyster sauce in a small bowl.',
-      'Heat oil in a wok or large skillet over high heat.',
-      'Add beef and stir fry for 2-3 minutes until browned. Remove and set aside.',
-      'Add more oil if needed, then stir fry garlic and ginger for 30 seconds.',
-      'Add vegetables and stir fry for 3-4 minutes until crisp-tender.',
-      'Return beef to the wok, add sauce, and toss everything together.',
-      'Serve hot over steamed rice.',
-    ],
-  },
-  '5': {
-    id: '5',
-    title: 'Mushroom Risotto',
-    image: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=800&h=600&fit=crop',
-    cookTime: '45 min',
-    servings: 4,
-    difficulty: 'Hard',
-    calories: 420,
-    description: 'Creamy, luxurious Italian risotto with earthy mushrooms and Parmesan cheese.',
-    ingredients: [
-      '1.5 cups Arborio rice',
-      '500g mixed mushrooms',
-      '6 cups chicken or vegetable stock',
-      '1 cup dry white wine',
-      '1 onion, finely diced',
-      '3 cloves garlic, minced',
-      '1/2 cup Parmesan cheese, grated',
-      '3 tbsp butter',
-      'Fresh thyme',
-    ],
-    instructions: [
-      'Heat stock in a saucepan and keep warm over low heat.',
-      'Sauté mushrooms in butter until golden, then set aside.',
-      'In a large pan, sauté onion until translucent, add garlic.',
-      'Add rice and toast for 1-2 minutes, stirring constantly.',
-      'Add wine and stir until absorbed.',
-      'Add warm stock one ladle at a time, stirring frequently.',
-      'Continue adding stock and stirring for about 18-20 minutes.',
-      'Stir in mushrooms, Parmesan, and remaining butter.',
-      'Season with salt, pepper, and fresh thyme.',
-    ],
-  },
-  '6': {
-    id: '6',
-    title: 'Chicken Curry',
-    image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800&h=600&fit=crop',
-    cookTime: '40 min',
-    servings: 4,
-    difficulty: 'Medium',
-    calories: 390,
-    description: 'A rich and aromatic chicken curry with warm spices and creamy coconut milk.',
-    ingredients: [
-      '600g chicken thighs, cubed',
-      '1 can coconut milk',
-      '2 tbsp curry powder',
-      '1 onion, diced',
-      '3 cloves garlic, minced',
-      '1 tbsp ginger, minced',
-      '2 tomatoes, diced',
-      'Fresh cilantro',
-      'Salt to taste',
-    ],
-    instructions: [
-      'Season chicken with salt and half the curry powder.',
-      'Brown chicken in a large pot, then remove and set aside.',
-      'Sauté onion until soft, add garlic and ginger.',
-      'Add remaining curry powder and toast for 1 minute.',
-      'Add tomatoes and cook until softened.',
-      'Pour in coconut milk and bring to a simmer.',
-      'Return chicken to the pot and simmer for 20-25 minutes.',
-      'Adjust seasoning and garnish with fresh cilantro.',
-      'Serve with basmati rice or naan bread.',
-    ],
-  },
 };
 
 export default function RecipeDetailScreen() {
-  const { id, title } = useLocalSearchParams<{ id: string; title: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const recipe = mockRecipeDetails[id] || mockRecipeDetails['1'];
+  useEffect(() => {
+    fetchRecipeDetail();
+  }, [id]);
+
+  const fetchRecipeDetail = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}/api/recipes/${id}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Recipe Detail:', data);
+      setRecipe(data);
+    } catch (error) {
+      console.error('Error fetching recipe detail:', error);
+      setError('Failed to load recipe');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -213,12 +65,36 @@ export default function RecipeDetailScreen() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D6A4F" />
+          <Text style={styles.loadingText}>Loading recipe...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error || !recipe) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Recipe not found'}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchRecipeDetail}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: recipe.image }} style={styles.heroImage} />
+          <Image source={{ uri: recipe.image_url }} style={styles.heroImage} />
           <View style={styles.imageOverlay} />
           
           {/* Back Button */}
@@ -243,7 +119,7 @@ export default function RecipeDetailScreen() {
         <View style={styles.content}>
           {/* Title Section */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>{recipe.title}</Text>
+            <Text style={styles.title}>{recipe.name}</Text>
             <Text style={styles.description}>{recipe.description}</Text>
           </View>
 
@@ -253,7 +129,7 @@ export default function RecipeDetailScreen() {
               <View style={styles.statIcon}>
                 <Clock size={20} color="#2D6A4F" />
               </View>
-              <Text style={styles.statValue}>{recipe.cookTime}</Text>
+              <Text style={styles.statValue}>{recipe.cookings_time} min</Text>
               <Text style={styles.statLabel}>Cook Time</Text>
             </View>
             <View style={styles.statItem}>
@@ -540,6 +416,41 @@ const styles = StyleSheet.create({
   startCookingText: {
     fontSize: 16,
     fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#95A99C',
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 48,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#F44336',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#2D6A4F',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });
