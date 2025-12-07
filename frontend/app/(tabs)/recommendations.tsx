@@ -6,59 +6,7 @@ import { Clock, Users, ChefHat, Search, X } from 'lucide-react-native';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
 
-const API_URL = 'http://192.168.1.109:8000'; // Update with your backend IP
-
-// Mock dish data
-const mockDishes = [
-  {
-    id: '1',
-    title: 'Spaghetti Carbonara',
-    image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=400&h=300&fit=crop',
-    cookTime: '30 min',
-    servings: 4,
-    difficulty: 'Medium',
-  },
-  {
-    id: '2',
-    title: 'Grilled Salmon',
-    image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&h=300&fit=crop',
-    cookTime: '25 min',
-    servings: 2,
-    difficulty: 'Easy',
-  },
-  {
-    id: '3',
-    title: 'Caesar Salad',
-    image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400&h=300&fit=crop',
-    cookTime: '15 min',
-    servings: 2,
-    difficulty: 'Easy',
-  },
-  {
-    id: '4',
-    title: 'Beef Stir Fry',
-    image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&h=300&fit=crop',
-    cookTime: '20 min',
-    servings: 3,
-    difficulty: 'Medium',
-  },
-  {
-    id: '5',
-    title: 'Mushroom Risotto',
-    image: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400&h=300&fit=crop',
-    cookTime: '45 min',
-    servings: 4,
-    difficulty: 'Hard',
-  },
-  {
-    id: '6',
-    title: 'Chicken Curry',
-    image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&h=300&fit=crop',
-    cookTime: '40 min',
-    servings: 4,
-    difficulty: 'Medium',
-  },
-];
+const API_URL = 'http://192.168.1.30:8000'; // Update with your backend IP
 
 type Dish = {
   id: string;
@@ -117,6 +65,62 @@ export default function RecommendationsScreen() {
   const [searchResults, setSearchResults] = useState<Dish[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [recipes, setRecipes] = useState<Dish[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch recipes from database on mount
+  useEffect(() => {
+    fetchRecipes();
+  }, []);
+
+  const fetchRecipes = async () => {
+    setIsLoading(true);
+    try {
+      // Get all recipes from database
+      const response = await fetch(`${API_URL}/api/recipes/`);
+      
+      if (!response.ok) {
+        console.log(`API returned status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      console.log('API Response:', data); // Debug log
+      
+      // Check if data is an array
+      if (!Array.isArray(data)) {
+        console.log('Data is not an array, setting empty recipes');
+        setRecipes([]);
+        return;
+      }
+      
+      // If no results, set empty
+      if (data.length === 0) {
+        console.log('No recipes found in database');
+        setRecipes([]);
+        return;
+      }
+      
+      // Map API response to Dish format
+      const mappedRecipes: Dish[] = data.map((recipe: any) => ({
+        id: recipe.id,
+        title: recipe.name,
+        image: recipe.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
+        cookTime: `${recipe.cookings_time} min`,
+        servings: recipe.servings || 2,
+        difficulty: recipe.difficulty || 'Medium',
+      }));
+      
+      setRecipes(mappedRecipes);
+    } catch (error) {
+      console.error('Error fetching recipes:', error);
+      // Set empty if API fails
+      setRecipes([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDishPress = (dish: Dish) => {
     router.push(`/recipe/${dish.id}` as any);
@@ -131,15 +135,30 @@ export default function RecommendationsScreen() {
     setIsSearching(true);
     try {
       const response = await fetch(`${API_URL}/api/recipes/search?query=${encodeURIComponent(searchQuery)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      
+      console.log('Search Response:', data); // Debug log
+      
+      // Check if data is an array
+      if (!Array.isArray(data)) {
+        console.log('Search data is not an array');
+        setSearchResults([]);
+        setShowSearchResults(true);
+        return;
+      }
       
       // Map API response to Dish format
       const mappedResults: Dish[] = data.map((recipe: any) => ({
         id: recipe.id,
         title: recipe.name,
         image: recipe.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
-        cookTime: `${recipe.cooking_time} min`,
-        servings: 4,
+        cookTime: `${recipe.cookings_time} min`,
+        servings: recipe.servings || 2,
         difficulty: recipe.difficulty || 'Medium',
       }));
       
@@ -147,11 +166,8 @@ export default function RecommendationsScreen() {
       setShowSearchResults(true);
     } catch (error) {
       console.error('Search error:', error);
-      // Fallback to local search in mockDishes
-      const filtered = mockDishes.filter(dish => 
-        dish.title.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setSearchResults(filtered);
+      // Set empty results if search fails
+      setSearchResults([]);
       setShowSearchResults(true);
     } finally {
       setIsSearching(false);
@@ -164,7 +180,7 @@ export default function RecommendationsScreen() {
     setShowSearchResults(false);
   };
 
-  const displayedDishes = showSearchResults ? searchResults : mockDishes;
+  const displayedDishes = showSearchResults ? searchResults : recipes;
 
   return (
     <View style={styles.container}>
@@ -215,12 +231,19 @@ export default function RecommendationsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.grid}>
-          {displayedDishes.map((dish) => (
-            <DishCard key={dish.id} dish={dish} onPress={() => handleDishPress(dish)} />
-          ))}
-        </View>
-        {displayedDishes.length === 0 && !isSearching && (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2D6A4F" />
+            <Text style={styles.loadingText}>Đang tải món ăn...</Text>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {displayedDishes.map((dish) => (
+              <DishCard key={dish.id} dish={dish} onPress={() => handleDishPress(dish)} />
+            ))}
+          </View>
+        )}
+        {displayedDishes.length === 0 && !isSearching && !isLoading && (
           <View style={styles.emptyState}>
             <ChefHat size={48} color="#95A99C" />
             <Text style={styles.emptyText}>Không có món ăn nào</Text>
@@ -302,6 +325,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+    color: '#95A99C',
+    marginTop: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 14,
     color: '#95A99C',
     marginTop: 12,
   },
