@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Camera, Plus, UtensilsCrossed, Newspaper } from 'lucide-react-native';
+import { Home, Camera, Plus, UtensilsCrossed, Newspaper, User } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -51,6 +51,13 @@ export default function TabLayout() {
         options={{
           title: 'News',
           tabBarIcon: ({ size, color }) => <Newspaper size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ size, color }) => <User size={size} color={color} />,
         }}
       />
     </Tabs>
