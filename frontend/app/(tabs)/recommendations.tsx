@@ -105,7 +105,7 @@ export default function RecommendationsScreen() {
       const mappedRecipes: Dish[] = data.map((recipe: any) => ({
         id: recipe.id,
         title: recipe.name,
-        image: recipe.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
+        image: recipe.image_url,
         cookTime: `${recipe.cookings_time} min`,
         servings: recipe.servings || 2,
         difficulty: recipe.difficulty || 'Medium',

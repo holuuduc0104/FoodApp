@@ -8,9 +8,12 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { User, Mail, Settings, LogOut, ChevronRight, Heart, Clock } from 'lucide-react-native';
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -64,7 +67,10 @@ export default function ProfileScreen() {
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/favorites')}
+          >
             <View style={styles.menuItemLeft}>
               <Heart size={20} color="#2D6A4F" />
               <Text style={styles.menuItemText}>Favorite Recipes</Text>
