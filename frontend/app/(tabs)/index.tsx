@@ -1,23 +1,51 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Camera, ChefHat, X } from 'lucide-react-native';
+import { Plus, Camera, ChefHat, X, LogOut } from 'lucide-react-native';
 import { useIngredients } from '@/context/IngredientsContext';
+import { supabase } from '@/supabase';
+import { useEffect, useState } from 'react';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { ingredients, removeIngredient } = useIngredients();
 
-  const handleRemoveIngredient = (id: string) => {
-    removeIngredient(id);
+  const [email, setEmail] = useState<string | null>(null);
+
+  // Lấy thông tin user từ Supabase
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setEmail(data.user?.email ?? null);
+    };
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.replace('../index.js');
   };
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <ChefHat size={32} color="#2D6A4F" />
-          <Text style={styles.headerTitle}>Smart Meal</Text>
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerContent}>
+            <ChefHat size={32} color="#FFFFFF" />
+            <Text style={styles.headerTitle}>Smart Meal</Text>
+          </View>
+
+          {/* User info + logout */}
+          {email && (
+            <View style={styles.userInfo}>
+              <Text style={styles.userEmail}>{email}</Text>
+              <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                <LogOut size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+
         <Text style={styles.headerSubtitle}>Recommendation</Text>
       </View>
 
@@ -36,7 +64,7 @@ export default function HomeScreen() {
                 <View key={ingredient.id} style={styles.ingredientChip}>
                   <Text style={styles.ingredientText}>{ingredient.name}</Text>
                   <TouchableOpacity
-                    onPress={() => handleRemoveIngredient(ingredient.id)}
+                    onPress={() => removeIngredient(ingredient.id)}
                     style={styles.removeButton}>
                     <X size={16} color="#2D6A4F" />
                   </TouchableOpacity>
@@ -46,22 +74,19 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No ingredients added yet</Text>
-              <Text style={styles.emptySubtext}>
-                Add ingredients to get meal recommendations
-              </Text>
+              <Text style={styles.emptySubtext}>Add ingredients to get meal recommendations</Text>
             </View>
           )}
         </View>
 
+        {/* Add Ingredient Buttons */}
         <View style={styles.actionsSection}>
           <Text style={styles.actionsSectionTitle}>Add More Ingredients</Text>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.primaryButton]}
             onPress={() => router.push('/ingredients')}>
-            <View style={styles.buttonIcon}>
-              <Plus size={24} color="#FFFFFF" />
-            </View>
+            <Plus size={24} color="#FFFFFF" />
             <View style={styles.buttonContent}>
               <Text style={styles.buttonTitle}>Manual Input</Text>
               <Text style={styles.buttonSubtitle}>Type ingredients yourself</Text>
@@ -71,9 +96,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={() => router.push('/camera')}>
-            <View style={styles.buttonIcon}>
-              <Camera size={24} color="#FFFFFF" />
-            </View>
+            <Camera size={24} color="#FFFFFF" />
             <View style={styles.buttonContent}>
               <Text style={styles.buttonTitle}>AI Camera Detection</Text>
               <Text style={styles.buttonSubtitle}>Scan ingredients with camera</Text>
@@ -93,10 +116,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FBF9',
-  },
+  container: { flex: 1, backgroundColor: '#F8FBF9' },
+
   header: {
     backgroundColor: '#2D6A4F',
     paddingTop: 60,
@@ -105,56 +126,76 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
+
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
+
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: '#FFFFFF',
   },
+
   headerSubtitle: {
     fontSize: 16,
     color: '#B8DCCF',
     marginTop: 4,
-    marginLeft: 44,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
+
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  section: {
-    marginTop: 24,
+
+  userEmail: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
+
+  logoutBtn: {
+    padding: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+  },
+
+  content: { flex: 1, paddingHorizontal: 20 },
+  section: { marginTop: 24 },
+
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
   },
+
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1B4332',
   },
+
   badge: {
     backgroundColor: '#FF8C42',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  ingredientsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
+
+  badgeText: { color: '#FFFFFF', fontWeight: '700' },
+
+  ingredientsList: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+
   ingredientChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -166,20 +207,12 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1.5,
     borderColor: '#E8F5E9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
     elevation: 2,
   },
-  ingredientText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#2D6A4F',
-  },
-  removeButton: {
-    padding: 2,
-  },
+
+  ingredientText: { fontSize: 15, fontWeight: '500', color: '#2D6A4F' },
+  removeButton: { padding: 2 },
+
   emptyState: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -189,70 +222,33 @@ const styles = StyleSheet.create({
     borderColor: '#E8F5E9',
     borderStyle: 'dashed',
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#95A99C',
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#B8C5BC',
-    textAlign: 'center',
-  },
-  actionsSection: {
-    marginTop: 32,
-    marginBottom: 16,
-  },
-  actionsSectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1B4332',
-    marginBottom: 16,
-  },
+
+  emptyText: { fontSize: 16, fontWeight: '600', color: '#95A99C' },
+  emptySubtext: { fontSize: 14, color: '#B8C5BC', textAlign: 'center' },
+
+  actionsSection: { marginTop: 32, marginBottom: 16 },
+  actionsSectionTitle: { fontSize: 18, fontWeight: '600', color: '#1B4332', marginBottom: 16 },
+
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
     elevation: 4,
+    gap: 16,
   },
-  primaryButton: {
-    backgroundColor: '#2D6A4F',
-  },
-  secondaryButton: {
-    backgroundColor: '#FF8C42',
-  },
-  buttonIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  buttonContent: {
-    flex: 1,
-  },
-  buttonTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  buttonSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-  },
+
+  primaryButton: { backgroundColor: '#2D6A4F' },
+  secondaryButton: { backgroundColor: '#FF8C42' },
+
+  buttonContent: { flex: 1 },
+
+  buttonTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
+  buttonSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.85)' },
+
   recommendButton: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FF8C42',
     borderRadius: 16,
@@ -260,15 +256,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 32,
     gap: 12,
-    shadowColor: '#FF8C42',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
   },
-  recommendButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+
+  recommendButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
 });
