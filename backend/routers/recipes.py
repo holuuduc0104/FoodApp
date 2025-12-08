@@ -146,7 +146,7 @@ async def search_recipes(
                 "name": recipe.get("name"),
                 "image_url": recipe.get("image_url"),
                 "description": recipe.get("description", ""),
-                "cookings_time": recipe.get("cooking_time", 30),
+                "cookings_time": recipe.get("cookings_time", 30),
                 "servings": recipe.get("servings", 2),
                 "calories": recipe.get("calories", 0),
                 "difficulty": recipe.get("difficulty", "Medium"),
@@ -179,7 +179,7 @@ async def get_recipe(
             "name": recipe.get("name"),
             "image_url": recipe.get("image_url"),
             "description": recipe.get("description", ""),
-            "cookings_time": recipe.get("cooking_time", 30),
+            "cookings_time": recipe.get("cookings_time", 30),
             "servings": recipe.get("servings", 2),
             "calories": recipe.get("calories", 0),
             "difficulty": recipe.get("difficulty", "Medium"),
@@ -187,4 +187,5 @@ async def get_recipe(
             "instructions": parse_list_field(recipe.get("instructions", ""))
         }
     except Exception as e:
+        print(f"Error getting recipe: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

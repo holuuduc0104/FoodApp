@@ -42,7 +42,16 @@ def analyze_with_gemini(image_bytes: bytes, prompt: str) -> str:
     
     # Debug: print response details
     print(f"Status Code: {response.status_code}")
-    print(f"Response: {response.text[:500]}")  # Print first 500 chars
+    
+    # Check for rate limit error
+    if response.status_code == 429:
+        error_data = response.json()
+        error_msg = error_data.get('error', {}).get('message', 'Rate limit exceeded')
+        print(f"Gemini API Rate Limit: {error_msg}")
+        raise HTTPException(
+            status_code=429,
+            detail="Gemini API rate limit exceeded. Please wait a moment and try again."
+        )
     
     response.raise_for_status()
     
@@ -70,50 +79,46 @@ async def analyze_food_image(file: UploadFile = File(...)) -> Dict:
         
         # Prepare prompt for Gemini
         prompt = """
-        Hãy phân tích hình ảnh này và cung cấp thông tin chi tiết theo định dạng JSON sau:
+        Analyze this food image and provide detailed information in the following JSON format:
         
         {
-            "dish_name": "Tên món ăn (tiếng Việt)",
-            "dish_name_en": "Dish name (English)",
-            "confidence": "Mức độ tự tin (high/medium/low)",
+            "name": "Dish name in English",
+            "name_local": "Dish name in local language (Vietnamese if applicable)",
+            "description": "Detailed description of the dish (2-3 sentences about what it is, main ingredients, and flavors)",
+            "cookings_time": "Total cooking time in minutes (as integer, e.g., 30)",
+            "servings": "Number of servings (as integer, e.g., 1, 2, 4)",
+            "calories": "Total calories in kcal (as integer, e.g., 450)",
+            "difficulty": "Difficulty level: easy, medium, or hard",
             "ingredients": [
-                {
-                    "name": "Tên nguyên liệu",
-                    "quantity": "Số lượng ước tính",
-                    "unit": "Đơn vị (gram, ml, củ, quả, v.v.)"
-                }
+                "400g spaghetti",
+                "200g pancetta or guanciale",
+                "4 large egg yolks",
+                "100g Pecorino Romano cheese"
             ],
-            "recipe": {
-                "prep_time": "Thời gian chuẩn bị (phút)",
-                "cook_time": "Thời gian nấu (phút)",
-                "servings": "Số người ăn",
-                "difficulty": "Độ khó (dễ/trung bình/khó)",
-                "steps": [
-                    "Bước 1: Mô tả chi tiết",
-                    "Bước 2: Mô tả chi tiết",
-                    "..."
-                ]
-            },
-            "nutrition": {
-                "calories": "Calories (kcal)",
-                "protein": "Protein (g)",
-                "carbs": "Carbs (g)",
-                "fat": "Fat (g)"
-            },
-            "tips": [
-                "Mẹo 1",
-                "Mẹo 2"
-            ],
-            "description": "Mô tả ngắn gọn về món ăn"
+            "instructions": [
+                "Bring a large pot of salted water to boil and cook spaghetti according to package directions.",
+                "While pasta cooks, cut pancetta into small cubes and fry in a large pan until crispy.",
+                "In a bowl, whisk together egg yolks, grated Pecorino, and Parmesan cheese.",
+                "When pasta is al dente, reserve 1 cup of pasta water, then drain."
+            ]
         }
         
-        Nếu không phải là hình ảnh món ăn, hãy trả về:
+        Important guidelines:
+        - For "cookings_time": provide total time (prep + cook) as a single integer number in minutes
+        - For "servings": provide as integer (typically 1-4)
+        - For "calories": estimate total calories as integer
+        - For "ingredients": return as array of strings, each string should include quantity and ingredient name (e.g., "400g spaghetti", "2 eggs", "Salt to taste")
+        - For "instructions": return as array of strings, each string is one step in the cooking process
+        - For "description": describe what makes this dish special and tasty
+        - Be specific with quantities and use standard units (grams, ml, tablespoon, teaspoon, cup, pieces, etc.)
+        
+        If this is not a food image, return:
         {
-            "error": "Không phát hiện món ăn trong hình ảnh",
-            "suggestion": "Vui lòng chụp ảnh món ăn rõ ràng hơn"
+            "error": "No food detected in the image",
+            "suggestion": "Please take a clearer picture of a food dish"
         }
         
-        Chỉ trả về JSON, không thêm text khác.
+        Return ONLY the JSON response, no additional text.
         """
         
         # Generate content with Gemini
@@ -145,82 +150,13 @@ async def analyze_food_image(file: UploadFile = File(...)) -> Dict:
             "data": result
         })
         
+    except HTTPException:
+        # Re-raise HTTPException (including rate limit errors)
+        raise
     except Exception as e:
         import traceback
-        error_detail = f"Error analyzing image: {str(e)}\n{traceback.format_exc()}"
-        print(error_detail)  # Print to console for debugging
-        raise HTTPException(
-            status_code=500,
-            detail=error_detail
-        )
-
-
-@router.post("/detect-ingredients")
-async def detect_ingredients(file: UploadFile = File(...)) -> Dict:
-    """
-    Detect ingredients from image using Gemini AI
-    """
-    try:
-        # Validate file type
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
-        
-        # Read and process image
-        image_data = await file.read()
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Prepare prompt for Gemini
-        prompt = """
-        Hãy phân tích hình ảnh này và liệt kê tất cả các nguyên liệu thực phẩm có thể nhìn thấy.
-        Trả về kết quả theo định dạng JSON:
-        
-        {
-            "ingredients": [
-                {
-                    "name": "Tên nguyên liệu (tiếng Việt)",
-                    "name_en": "Ingredient name (English)",
-                    "category": "Loại (rau củ/thịt/hải sản/gia vị/v.v.)",
-                    "confidence": "Mức độ tự tin (high/medium/low)"
-                }
-            ],
-            "total_count": số_lượng_nguyên_liệu
-        }
-        
-        Chỉ trả về JSON, không thêm text khác.
-        """
-        
-        # Generate content with Gemini
-        response_text = analyze_with_gemini(image_data, prompt).strip()
-        
-        # Remove markdown code blocks if present
-        if response_text.startswith('```json'):
-            response_text = response_text[7:]
-        if response_text.startswith('```'):
-            response_text = response_text[3:]
-        if response_text.endswith('```'):
-            response_text = response_text[:-3]
-        
-        response_text = response_text.strip()
-        
-        # Parse JSON response
-        import json
-        try:
-            result = json.loads(response_text)
-        except json.JSONDecodeError:
-            result = {
-                "error": "Failed to parse AI response",
-                "raw_response": response_text
-            }
-        
-        return JSONResponse(content={
-            "success": True,
-            "data": result
-        })
-        
-    except Exception as e:
-        import traceback
-        error_detail = f"Error detecting ingredients: {str(e)}\n{traceback.format_exc()}"
-        print(error_detail)  # Print to console for debugging
+        error_detail = f"Error analyzing image: {str(e)}"
+        print(f"{error_detail}\n{traceback.format_exc()}")  # Print to console for debugging
         raise HTTPException(
             status_code=500,
             detail=error_detail
