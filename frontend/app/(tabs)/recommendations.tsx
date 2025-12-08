@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Clock, Users, ChefHat, Search, X } from 'lucide-react-native';
+import { API_URL } from '@/config/api';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
-
-const API_URL = 'http://192.168.1.30:8000'; // Update with your backend IP
 
 type Dish = {
   id: string;
