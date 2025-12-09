@@ -4,6 +4,8 @@ from database import get_supabase_client
 from supabase import Client
 from typing import List, Optional
 import json
+import requests
+from fastapi import Body
 
 router = APIRouter()
 
@@ -100,30 +102,30 @@ async def get_all_recipes(
 #     try:
 #         # Get user's ingredients
 #         ingredients_response = supabase.table("ingredients").select("name").eq("user_id", user_id).execute()
-#         
+#
 #         if not ingredients_response.data:
 #             return []
-#         
+#
 #         user_ingredients = [ing["name"].lower() for ing in ingredients_response.data]
-#         
+#
 #         # Get all recipes
 #         recipes_response = supabase.table("recipes").select("*").execute()
-#         
+#
 #         # Filter recipes that match user's ingredients
 #         matching_recipes = []
 #         for recipe in recipes_response.data:
 #             recipe_ingredients = [ing.lower() for ing in recipe.get("ingredients", [])]
 #             match_count = sum(1 for ing in recipe_ingredients if ing in user_ingredients)
-#             
+#
 #             if match_count > 0:
 #                 matching_recipes.append({
 #                     **recipe,
 #                     "match_score": match_count
 #                 })
-#         
+#
 #         # Sort by match score
 #         matching_recipes.sort(key=lambda x: x["match_score"], reverse=True)
-#         
+#
 #         return matching_recipes[:10]  # Return top 10
 #     except Exception as e:
 #         raise HTTPException(status_code=400, detail=str(e))
@@ -158,6 +160,59 @@ async def search_recipes(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/find-by-ingredients")
+async def find_by_ingredients(
+    ingredients: List[str] = Body(...)
+):
+    """
+    Find recipes from Spoonacular and convert response to FE-friendly format
+    """
+    try:
+        api_key = "de0f17fa0f7c4189a2ee16e7ab11a572"
+
+        ing_string = ",".join(ingredients)
+
+        url = (
+            "https://api.spoonacular.com/recipes/findByIngredients"
+            f"?ingredients={ing_string}&number=10&apiKey={api_key}"
+        )
+
+        response = requests.get(url)
+        data = response.json()
+
+        formatted = []
+
+        for item in data:
+            formatted.append({
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "image": item.get("image"),
+
+                # Spoonacular provides:
+                # usedIngredients → list of ingredient objects
+                "usedIngredients": [
+                    {"id": ing["id"], "name": ing["name"]}
+                    for ing in item.get("usedIngredients", [])
+                ],
+
+                # missedIngredients → list of objects
+                "missedIngredients": [
+                    {"id": ing["id"], "name": ing["name"]}
+                    for ing in item.get("missedIngredients", [])
+                ],
+
+                # unusedIngredients không có sẵn → tự tạo
+                "unusedIngredients": [
+                    {"name": ing}
+                    for ing in ingredients
+                    if ing.lower() not in [u["name"].lower() for u in item.get("usedIngredients", [])]
+                ]
+            })
+
+        return formatted
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
