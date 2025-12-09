@@ -46,7 +46,7 @@ async def health_check():
 
 
 # Import routers
-from routers import auth, ingredients, recipes, articles, ai_analysis, favorites
+from routers import auth, ingredients, recipes, articles, ai_analysis, favorites, spoonacular_api
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(ingredients.router, prefix="/api/ingredients", tags=["Ingredients"])
@@ -54,6 +54,9 @@ app.include_router(recipes.router, prefix="/api/recipes", tags=["Recipes"])
 app.include_router(articles.router, prefix="/api/articles", tags=["Articles"])
 app.include_router(ai_analysis.router, prefix="/api/ai", tags=["AI Analysis"])
 app.include_router(favorites.router, prefix="/api/favorites", tags=["Favorites"])
+
+# Router mới để gọi Spoonacular API
+app.include_router(spoonacular_api.router, prefix="/api/external", tags=["External Recipes"])
 
 
 if __name__ == "__main__":
