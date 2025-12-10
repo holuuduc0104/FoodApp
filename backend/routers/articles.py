@@ -49,13 +49,70 @@ async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: in
     """
     global _news_cache
     
-    # Food-focused search query - more specific to get relevant results
-    # Using quotes for exact phrases and combining with food-related terms
-    food_query = (
-        '("food" OR "recipe" OR "cooking" OR "chef" OR "restaurant" OR "cuisine" OR '
-        '"nutrition" OR "meal" OR "dish" OR "ingredient" OR "kitchen" OR "culinary" OR '
-        '"baking" OR "gourmet" OR "diet" OR "healthy eating" OR "food trend")'
-    )
+    # Food-focused search query - very specific to get only food/cooking related results
+    food_query = '"recipe" OR "restaurant" OR "chef" OR "cooking tips" OR "food review"'
+    
+    # Keywords that MUST be present (at least one) - strong food indicators
+    FOOD_MUST_KEYWORDS = [
+        'recipe', 'recipes', 'cooking', 'cook', 'chef', 'chefs',
+        'restaurant', 'restaurants', 'cuisine', 'cuisines',
+        'dish', 'dishes', 'meal', 'meals', 'menu',
+        'ingredient', 'ingredients', 'kitchen',
+        'baking', 'bake', 'baker', 'bakery',
+        'gourmet', 'culinary', 'gastronomy',
+        'breakfast', 'lunch', 'dinner', 'brunch',
+        'dessert', 'appetizer', 'entree', 'soup', 'salad',
+        'pasta', 'pizza', 'burger', 'sandwich', 'sushi', 'noodle',
+        'steak', 'seafood', 'vegetarian', 'vegan',
+        'michelin', 'foodie', 'bistro', 'cafe', 'diner',
+        'delicious', 'tasty', 'yummy', 'flavor', 'flavour',
+        'grilled', 'roasted', 'fried', 'steamed', 'baked',
+        'homemade', 'food truck', 'street food', 'fine dining',
+        'taco', 'burrito', 'curry', 'stir fry', 'bbq', 'barbecue',
+        'mcdonald', 'burger king', 'kfc', 'wendy', 'chipotle',
+        'starbucks', 'dunkin', 'pizza hut', 'domino',
+        'food safety', 'food recall', 'food price', 'grocery',
+        'supermarket', 'food industry', 'food chain'
+    ]
+    
+    # Keywords that indicate NON-food content - must NOT be present
+    NON_FOOD_KEYWORDS = [
+        'disney', 'magic kingdom', 'theme park', 'amusement',
+        'movie', 'film', 'actor', 'actress', 'hollywood', 'netflix', 'streaming',
+        'politics', 'election', 'president', 'congress', 'senate', 'democrat', 'republican',
+        'war', 'military', 'army', 'weapon', 'missile', 'ukraine', 'russia',
+        'bitcoin', 'crypto', 'cryptocurrency', 'stock market', 'wall street', 'nasdaq', 'dow jones',
+        'football', 'basketball', 'soccer', 'tennis', 'golf', 'nfl', 'nba', 'mlb', 'nhl',
+        'celebrity', 'kardashian', 'taylor swift', 'concert', 'album', 'spotify',
+        'katy perry', 'justin trudeau', 'justin bieber', 'beyonce', 'drake', 'kanye',
+        'piers morgan', 'nick fuentes', 'hili dialogue',
+        'video game', 'gaming', 'playstation', 'xbox', 'nintendo', 'esports', 'fortnite',
+        'iphone', 'android', 'software', 'app store', 'startup', 'silicon valley',
+        'elon musk', 'tesla', 'spacex', 'rocket', 'nasa', 'mars', 'astronaut',
+        'climate change', 'earthquake', 'hurricane', 'tornado', 'flood', 'wildfire',
+        'murder', 'crime', 'arrest', 'prison', 'court case', 'lawsuit', 'trial', 'verdict',
+        'investment', 'investor', 'hedge fund', 'ipo', 'merger', 'acquisition',
+        'refrigeration oils', 'market trends', 'industry outlook', 'global summit',
+        'liam neeson', 'pamela anderson', 'romance', 'dating', 'instagram official',
+        't lounge', 'lounge for december', 'black people', 'racism', 'racist'
+    ]
+    
+    def is_food_related(title: str, description: str) -> bool:
+        """Check if article is food-related based on title and description"""
+        text = f"{title} {description}".lower()
+        
+        # First check if any non-food keywords are present - reject immediately
+        for keyword in NON_FOOD_KEYWORDS:
+            if keyword in text:
+                return False
+        
+        # Then check if at least one food keyword is present - require match
+        for keyword in FOOD_MUST_KEYWORDS:
+            if keyword in text:
+                return True
+        
+        # No food keywords found - reject
+        return False
     
     search_query = query if query else food_query
     cache_key = f"{search_query}_{page}_{page_size}"
@@ -77,10 +134,8 @@ async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: in
                 "apiKey": settings.newsapi_key,
                 "language": "en",
                 "sortBy": "publishedAt",
-                "pageSize": min(page_size + 10, MAX_PAGE_SIZE),  # Request extra to filter invalid
+                "pageSize": MAX_PAGE_SIZE,  # Request max to have more to filter
                 "page": page,
-                # Add domains for food-focused sources (optional but helps)
-                # "domains": "foodnetwork.com,bonappetit.com,seriouseats.com,eater.com"
             }
             response = await client.get(url, params=params, timeout=30.0)
             
@@ -103,6 +158,10 @@ async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: in
                     continue
                     
                 if title == "[Removed]" or description == "[Removed]":
+                    continue
+                
+                # Filter: Only include food-related articles
+                if not is_food_related(title, description):
                     continue
                 
                 # Create unique ID based on page and index
