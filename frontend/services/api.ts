@@ -58,22 +58,97 @@ export interface AnalyzeFoodResponse {
 }
 
 /**
+ * Upload image to Supabase Storage
+ * Returns public URL of uploaded image
+ */
+export async function uploadImage(imageUri: string): Promise<{ success: boolean; url: string }> {
+  try {
+    console.log('[uploadImage] Starting upload for URI:', imageUri);
+    const formData = new FormData();
+    
+    // Handle blob URLs (web) vs file URIs (mobile)
+    if (imageUri.startsWith('blob:')) {
+      console.log('[uploadImage] Detected blob URL, fetching...');
+      // Web: fetch blob and convert to File
+      const response = await fetch(imageUri);
+      console.log('[uploadImage] Blob fetch response:', response.status);
+      const blob = await response.blob();
+      console.log('[uploadImage] Blob size:', blob.size, 'type:', blob.type);
+      const file = new File([blob], 'recipe.jpg', { type: blob.type || 'image/jpeg' });
+      formData.append('file', file);
+      console.log('[uploadImage] FormData prepared with File');
+    } else {
+      console.log('[uploadImage] Detected file URI (mobile)');
+      // React Native: use file URI
+      const filename = imageUri.split('/').pop() || 'recipe.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('file', {
+        uri: imageUri,
+        name: filename,
+        type,
+      } as any);
+      console.log('[uploadImage] FormData prepared with URI');
+    }
+
+    const uploadUrl = `${API_BASE_URL}/upload/image`;
+    console.log('[uploadImage] Uploading to:', uploadUrl);
+    
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log('[uploadImage] Upload response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[uploadImage] Upload failed:', errorData);
+      throw new Error(errorData.detail || `Upload failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('[uploadImage] Upload successful:', result);
+    return {
+      success: result.success,
+      url: result.url,
+    };
+  } catch (error) {
+    console.error('[uploadImage] Error:', error);
+    throw error;
+  }
+}
+
+/**
  * Analyze food image and get dish information with recipe
  */
 export async function analyzeFoodImage(imageUri: string): Promise<AnalyzeFoodResponse> {
   try {
     const formData = new FormData();
     
-    // Create file from URI
-    const filename = imageUri.split('/').pop() || 'photo.jpg';
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
-    
-    formData.append('file', {
-      uri: imageUri,
-      name: filename,
-      type,
-    } as any);
+    // Handle blob URLs (web) vs file URIs (mobile)
+    if (imageUri.startsWith('blob:')) {
+      // Web: fetch blob and convert to File
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const file = new File([blob], 'photo.jpg', { type: blob.type || 'image/jpeg' });
+      formData.append('file', file);
+    } else {
+      // React Native: use file URI
+      const filename = imageUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('file', {
+        uri: imageUri,
+        name: filename,
+        type,
+      } as any);
+    }
 
     const response = await fetch(`${API_BASE_URL}/ai/analyze-food`, {
       method: 'POST',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Heart, AlertCircle, CheckCircle, XCircle } from 'lucide-react-native';
+import { API_URL } from '@/config/api';
 
 type Ingredient = {
   id: number;
@@ -87,7 +88,7 @@ export default function RecipeDetailScreen() {
 
       // Now fetch instructions
       const response = await fetch(
-        `http://127.0.0.1:8000/api/external/recipes/${id}/instructions`
+        `${API_URL}/api/external/recipes/${id}/instructions`
       );
 
       let instructionsData: any = null;

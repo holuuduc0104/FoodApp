@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useIngredients } from '@/context/IngredientsContext';
 import { Camera, Rotate3D, Sparkles, Image as ImageIcon, Heart, X } from 'lucide-react-native';
-import { analyzeFoodImage } from '@/services/api';
+import { analyzeFoodImage, uploadImage } from '@/services/api';
 import { API_URL } from '@/config/api';
 import { supabase } from '../../supabase';
 
@@ -181,7 +181,30 @@ export default function CameraScreen() {
       const userId = session.user.id;
       console.log('Current user ID:', userId);
       
-      // Prepare recipe data with user_id
+      // Upload image to Supabase Storage first
+      let uploadedImageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop'; // Default image
+      
+      if (analysisResult.image_url) {
+        try {
+          console.log('Uploading image to Supabase Storage...');
+          console.log('Image URI:', analysisResult.image_url);
+          
+          const uploadResult = await uploadImage(analysisResult.image_url);
+          
+          if (uploadResult.success && uploadResult.url) {
+            uploadedImageUrl = uploadResult.url;
+            console.log('Image uploaded successfully:', uploadedImageUrl);
+          } else {
+            console.log('Upload result missing URL, using default image');
+          }
+        } catch (uploadError) {
+          console.error('Image upload failed:', uploadError);
+          console.log('Using default image instead');
+          // Use default image - no alert needed
+        }
+      }
+      
+      // Prepare recipe data with user_id and uploaded image URL
       const recipeData = {
         user_id: userId,  // Send user_id in body instead of header
         name: analysisResult.name,
@@ -192,7 +215,7 @@ export default function CameraScreen() {
         servings: analysisResult.servings || 1,
         difficulty: analysisResult.difficulty || 'medium',
         calories: analysisResult.calories || null,
-        image_url: analysisResult.image_url || null,  // Include image URL
+        image_url: uploadedImageUrl,  // Use uploaded image URL instead of local path
       };
       
       console.log('Sending recipe data with user_id:', recipeData.user_id);

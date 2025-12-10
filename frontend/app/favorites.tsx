@@ -34,7 +34,11 @@ function DishCard({ dish, onPress, onDelete }: { dish: Dish; onPress: () => void
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <Image source={{ uri: dish.image }} style={styles.cardImage} />
+      <Image 
+        source={{ uri: dish.image }} 
+        style={styles.cardImage}
+        resizeMode="cover"
+      />
       
       {/* Delete button */}
       <TouchableOpacity 
