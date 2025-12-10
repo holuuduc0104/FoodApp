@@ -5,12 +5,14 @@ import { useIngredients } from '@/context/IngredientsContext';
 import { supabase } from '@/supabase';
 import { useEffect, useState } from 'react';
 
+
 export default function HomeScreen() {
   const router = useRouter();
   const { ingredients, removeIngredient } = useIngredients();
 
   const [email, setEmail] = useState<string | null>(null);
 
+  
   // Lấy thông tin user từ Supabase
   useEffect(() => {
     const fetchUser = async () => {
@@ -22,7 +24,7 @@ export default function HomeScreen() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.replace('../index.js');
+    router.replace('../auth');
   };
 
   return (
@@ -35,6 +37,9 @@ export default function HomeScreen() {
             <Text style={styles.headerTitle}>Smart Meal</Text>
           </View>
 
+
+
+          
           {/* User info + logout */}
           {email && (
             <View style={styles.userInfo}>

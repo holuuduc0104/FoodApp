@@ -43,7 +43,7 @@ export default function AuthScreen() {
         alert("Không lưu được vào bảng profiles!");
       }
 
-      alert("Đăng ký thành công. Vui lòng đăng nhập!");
+      alert("Registration successful. Please log in!");
       setIsLogin(true);
     }
   };

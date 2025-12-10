@@ -1,32 +1,50 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { User, Mail, Settings, LogOut, ChevronRight, Heart, Clock } from 'lucide-react-native';
+import { User, Settings, LogOut, Heart, Clock, ChevronRight } from 'lucide-react-native';
+import { supabase } from "../../supabase";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  
+  const [userEmail, setUserEmail] = useState("guest@foodapp.com");
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.email) {
+        setUserEmail(user.email);
+      }
+    };
+    getUser();
+  }, []);
+
+const handleLogout = async () => {
+  await supabase.auth.signOut();
+  router.replace('../auth'); // quay về index.tsx
+};
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
+        
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <User size={48} color="#2D6A4F" />
             </View>
           </View>
-          <Text style={styles.name}>Guest User</Text>
-          <Text style={styles.email}>guest@foodapp.com</Text>
+
+          <Text style={styles.name}>{userEmail.split("@")[0]}</Text>
+          <Text style={styles.email}>{userEmail}</Text>
         </View>
+
 
         {/* Stats */}
         <View style={styles.statsContainer}>
@@ -88,10 +106,10 @@ export default function ProfileScreen() {
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
-          <LogOut size={20} color="#FF4444" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+  <LogOut size={20} color="#FF4444" />
+  <Text style={styles.logoutText}>Log Out</Text>
+</TouchableOpacity>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Version 1.0.0</Text>
