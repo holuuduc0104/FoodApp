@@ -32,7 +32,11 @@ function DishCard({ dish, onPress }: { dish: Dish; onPress: () => void }) {
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <Image source={{ uri: dish.image }} style={styles.cardImage} />
+      <Image 
+        source={{ uri: dish.image }} 
+        style={styles.cardImage}
+        resizeMode="cover"
+      />
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {dish.title}
@@ -193,7 +197,7 @@ export default function RecommendationsScreen() {
             <Search size={20} color="#95A99C" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Tìm kiếm món ăn..."
+              placeholder="Search..."
               placeholderTextColor="#95A99C"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -210,7 +214,7 @@ export default function RecommendationsScreen() {
             {isSearching ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.searchButtonText}>Tìm</Text>
+              <Text style={styles.searchButtonText}>Search</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -218,8 +222,8 @@ export default function RecommendationsScreen() {
         {showSearchResults && (
           <Text style={styles.searchResultText}>
             {searchResults.length > 0 
-              ? `Tìm thấy ${searchResults.length} kết quả cho "${searchQuery}"`
-              : `Không tìm thấy kết quả cho "${searchQuery}"`
+              ? `Find ${searchResults.length} results for "${searchQuery}"`
+              : `No results found for "${searchQuery}"`
             }
           </Text>
         )}
@@ -233,7 +237,7 @@ export default function RecommendationsScreen() {
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#2D6A4F" />
-            <Text style={styles.loadingText}>Đang tải món ăn...</Text>
+            <Text style={styles.loadingText}>Loading dishes...</Text>
           </View>
         ) : (
           <View style={styles.grid}>
@@ -245,7 +249,7 @@ export default function RecommendationsScreen() {
         {displayedDishes.length === 0 && !isSearching && !isLoading && (
           <View style={styles.emptyState}>
             <ChefHat size={48} color="#95A99C" />
-            <Text style={styles.emptyText}>Không có món ăn nào</Text>
+            <Text style={styles.emptyText}>No dishes available</Text>
           </View>
         )}
       </ScrollView>

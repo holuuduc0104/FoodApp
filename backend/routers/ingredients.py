@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from database import get_supabase_client
 from supabase import Client
@@ -29,6 +29,66 @@ async def get_ingredients(
         return response.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/search")
+async def search_ingredients(
+    query: str = Query(default="", min_length=0),
+    limit: int = Query(default=50, le=100),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Search ingredients by name in database"""
+    try:
+        if not query or query.strip() == "":
+            # Return empty list if no query
+            return []
+        
+        # Search using ilike for case-insensitive search
+        search_pattern = f"%{query}%"
+        response = supabase.table("ingredients").select("id, name").ilike("name", search_pattern).limit(limit).execute()
+        
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error searching ingredients: {e}")
+        return []
+
+
+@router.get("/popular")
+async def get_popular_ingredients(
+    ids: str = Query(default="1,2,3,4,5,6"),
+    supabase: Client = Depends(get_supabase_client)
+):
+    """Get popular ingredients by IDs"""
+    try:
+        # Parse comma-separated string to list of integers
+        id_list = [int(id.strip()) for id in ids.split(',') if id.strip()]
+        
+        # Convert list of IDs to filter
+        response = supabase.table("ingredients").select("id, name").in_("id", id_list).execute()
+        
+        if not response.data:
+            # Return default popular ingredients if none found
+            return [
+                {"id": 1, "name": "Tomato"},
+                {"id": 2, "name": "Onion"},
+                {"id": 3, "name": "Garlic"},
+                {"id": 4, "name": "Carrot"},
+                {"id": 5, "name": "Potato"},
+                {"id": 6, "name": "Chicken"},
+            ]
+        
+        return response.data
+    except Exception as e:
+        print(f"Error fetching popular ingredients: {e}")
+        # Return default list on error
+        return [
+            {"id": 1, "name": "Tomato"},
+            {"id": 2, "name": "Onion"},
+            {"id": 3, "name": "Garlic"},
+            {"id": 4, "name": "Carrot"},
+            {"id": 5, "name": "Potato"},
+            {"id": 6, "name": "Chicken"},
+        ]
 
 
 @router.post("/", response_model=IngredientResponse)

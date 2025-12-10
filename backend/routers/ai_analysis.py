@@ -69,9 +69,14 @@ async def analyze_food_image(file: UploadFile = File(...)) -> Dict:
     Analyze food image using Gemini AI to detect dish and provide recipe
     """
     try:
-        # Validate file type
-        if not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
+        print(f"=== Received file upload ===")
+        print(f"Filename: {file.filename}")
+        print(f"Content-Type: {file.content_type}")
+        print(f"File size: {file.size if hasattr(file, 'size') else 'unknown'}")
+        
+        # Validate file type (allow common image types)
+        if file.content_type and not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail=f"File must be an image, got: {file.content_type}")
         
         # Read and process image
         image_data = await file.read()
@@ -156,7 +161,11 @@ async def analyze_food_image(file: UploadFile = File(...)) -> Dict:
     except Exception as e:
         import traceback
         error_detail = f"Error analyzing image: {str(e)}"
-        print(f"{error_detail}\n{traceback.format_exc()}")  # Print to console for debugging
+        error_trace = traceback.format_exc()
+        print(f"=== ERROR ===")
+        print(f"{error_detail}")
+        print(f"{error_trace}")
+        print(f"=============")
         raise HTTPException(
             status_code=500,
             detail=error_detail
