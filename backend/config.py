@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Gemini AI
     gemini_api_key: str
     
+    # NewsAPI
+    newsapi_key: str
+    
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
@@ -23,8 +26,9 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: str = "http://localhost:8081"
 
-    # Spoonacular API Key (ADD THIS)
-    spoonacular_api_key: str
+    # Spoonacular API Key (optional)
+    spoonacular_api_key: str 
+
 
     class Config:
         env_file = str(BASE_DIR / ".env")

@@ -8,3 +8,4 @@ python-multipart==0.0.9
 Pillow==10.2.0
 google-generativeai
 email-validator
+httpx==0.26.0
