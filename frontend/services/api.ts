@@ -1,6 +1,8 @@
 // API Service for FoodApp
+import { API_URL } from '@/config/api';
 
-const API_BASE_URL = 'http://192.168.1.166:8000/api';
+//const API_BASE_URL = 'http://192.168.1.166:8000/api';
+const API_BASE_URL = `${API_URL}/api`;
 
 export interface Article {
   id: string;
@@ -25,37 +27,6 @@ export interface PaginatedArticlesResponse {
   has_more: boolean;
 }
 
-export interface AnalyzeFoodResponse {
-  success: boolean;
-  data: {
-    dish_name?: string;
-    dish_name_en?: string;
-    confidence?: string;
-    ingredients?: Array<{
-      name: string;
-      quantity: string;
-      unit: string;
-    }>;
-    recipe?: {
-      prep_time: string;
-      cook_time: string;
-      servings: string;
-      difficulty: string;
-      steps: string[];
-    };
-    nutrition?: {
-      calories: string;
-      protein: string;
-      carbs: string;
-      fat: string;
-    };
-    tips?: string[];
-    description?: string;
-    error?: string;
-    suggestion?: string;
-  };
-}
-
 export interface DetectIngredientsResponse {
   success: boolean;
   data: {
@@ -66,6 +37,23 @@ export interface DetectIngredientsResponse {
       confidence: string;
     }>;
     total_count: number;
+  };
+}
+
+export interface AnalyzeFoodResponse {
+  success: boolean;
+  data: {
+    name?: string;
+    name_local?: string;
+    description?: string;
+    cookings_time?: number;
+    servings?: number;
+    calories?: number;
+    difficulty?: string;
+    ingredients?: string[];  // Changed to array of strings
+    instructions?: string[];  // Changed to array of strings
+    error?: string;
+    suggestion?: string;
   };
 }
 
@@ -96,7 +84,14 @@ export async function analyzeFoodImage(imageUri: string): Promise<AnalyzeFoodRes
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.detail || `HTTP error! status: ${response.status}`;
+      
+      if (response.status === 429) {
+        throw new Error('Gemini API rate limit exceeded. Please wait a moment and try again..');
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();

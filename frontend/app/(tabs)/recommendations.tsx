@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Clock, Users, ChefHat, Search, X } from 'lucide-react-native';
+import { API_URL } from '@/config/api';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
-
-const API_URL = 'http://192.168.1.30:8000'; // Update with your backend IP
 
 type Dish = {
   id: string;
@@ -106,7 +105,7 @@ export default function RecommendationsScreen() {
       const mappedRecipes: Dish[] = data.map((recipe: any) => ({
         id: recipe.id,
         title: recipe.name,
-        image: recipe.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop',
+        image: recipe.image_url,
         cookTime: `${recipe.cookings_time} min`,
         servings: recipe.servings || 2,
         difficulty: recipe.difficulty || 'Medium',

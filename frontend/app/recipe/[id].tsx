@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Clock, Users, ChefHat, Flame, Heart } from 'lucide-react-native';
+import { API_URL } from '@/config/api';
 
 const { width } = Dimensions.get('window');
-const API_URL = 'http://192.168.1.30:8000'; // Update with your backend IP
 
 type Recipe = {
   id: string;

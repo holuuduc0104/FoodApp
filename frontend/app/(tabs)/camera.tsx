@@ -8,13 +8,17 @@ import {
   Dimensions,
   ActivityIndicator,
   ScrollView,
+  Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useIngredients } from '@/context/IngredientsContext';
-import { Camera, Rotate3D, Sparkles, Image as ImageIcon } from 'lucide-react-native';
-import { analyzeFoodImage, detectIngredients } from '@/services/api';
+import { Camera, Rotate3D, Sparkles, Image as ImageIcon, Heart, X } from 'lucide-react-native';
+import { analyzeFoodImage } from '@/services/api';
+import { API_URL } from '@/config/api';
+import { supabase } from '../../supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,6 +42,8 @@ export default function CameraScreen() {
   const [isDetecting, setIsDetecting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [isSavingFavorite, setIsSavingFavorite] = useState(false);
   const cameraRef = useRef<any>(null);
   const { addIngredient } = useIngredients();
 
@@ -76,7 +82,7 @@ export default function CameraScreen() {
       await analyzeImage(photo.uri);
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Lỗi', 'Không thể chụp ảnh. Vui lòng thử lại.');
+      Alert.alert('Error', 'Unable to take photo. Please try again.');
     } finally {
       setIsDetecting(false);
     }
@@ -96,7 +102,7 @@ export default function CameraScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Lỗi', 'Không thể chọn ảnh. Vui lòng thử lại.');
+      Alert.alert('Error', 'Unable to pick image. Please try again.');
     }
   };
 
@@ -105,33 +111,119 @@ export default function CameraScreen() {
       setIsAnalyzing(true);
       setAnalysisResult(null);
       
+      console.log('=== Starting image analysis ===');
+      console.log('Image URI:', imageUri);
+      
       const response = await analyzeFoodImage(imageUri);
+      
+      console.log('=== API Response ===');
+      console.log('Success:', response.success);
+      console.log('Data:', JSON.stringify(response.data, null, 2));
       
       if (response.success && response.data) {
         if (response.data.error) {
+          console.log('AI detected error:', response.data.error);
           Alert.alert('Thông báo', response.data.error + '\n' + (response.data.suggestion || ''));
         } else {
-          setAnalysisResult(response.data);
+          // Add image_url to result
+          const resultWithImage = {
+            ...response.data,
+            image_url: imageUri  // Save the image URI
+          };
+          console.log('Setting analysis result:', resultWithImage);
+          setAnalysisResult(resultWithImage);
+          setShowResultModal(true);
           
           // Add ingredients to context
-          if (response.data.ingredients) {
+          if (response.data.ingredients && Array.isArray(response.data.ingredients)) {
+            console.log('Adding ingredients to context:', response.data.ingredients);
             response.data.ingredients.forEach((ing) => {
-              addIngredient(ing.name);
+              if (typeof ing === 'string') {
+                addIngredient(ing);
+              }
             });
           }
-          
-          Alert.alert(
-            'Phân tích thành công!',
-            `Món ăn: ${response.data.dish_name}\n\nĐã thêm ${response.data.ingredients?.length || 0} nguyên liệu vào danh sách của bạn.`,
-            [{ text: 'OK' }]
-          );
         }
+      } else {
+        console.error('Invalid response:', response);
+        Alert.alert('Error', 'AI response không hợp lệ');
       }
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      Alert.alert('Lỗi', 'Không thể phân tích ảnh. Vui lòng kiểm tra kết nối mạng và thử lại.');
+    } catch (error: any) {
+      console.error('=== Error analyzing image ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', `Lỗi phân tích ảnh: ${error.message || 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
+      console.log('=== Analysis complete ===');
+    }
+  };
+
+  const handleAddToFavorite = async () => {
+    if (!analysisResult) return;
+    
+    try {
+      setIsSavingFavorite(true);
+      
+      // Get current user from Supabase session
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('Session check:', { hasSession: !!session, error });
+      
+      if (!session?.user?.id) {
+        console.log('No user found in session');
+        Alert.alert('Not Logged In', 'No session found. Please login first, then try again.');
+        setShowResultModal(false);
+        setIsSavingFavorite(false);
+        return;
+      }
+      
+      const userId = session.user.id;
+      console.log('Current user ID:', userId);
+      
+      // Prepare recipe data with user_id
+      const recipeData = {
+        user_id: userId,  // Send user_id in body instead of header
+        name: analysisResult.name,
+        description: analysisResult.description || '',
+        ingredients: analysisResult.ingredients || [],
+        instructions: analysisResult.instructions || (analysisResult.description ? [analysisResult.description] : []),  // Use description as fallback
+        cookings_time: analysisResult.cookings_time || null,
+        servings: analysisResult.servings || 1,
+        difficulty: analysisResult.difficulty || 'medium',
+        calories: analysisResult.calories || null,
+        image_url: analysisResult.image_url || null,  // Include image URL
+      };
+      
+      console.log('Sending recipe data with user_id:', recipeData.user_id);
+      console.log('Recipe data object:', JSON.stringify(recipeData, null, 2));
+      
+      console.log('Making request to save recipe...');
+      
+      // Call API to save recipe and add to favorites
+      const response = await fetch(`${API_URL}/api/favorites/save-ai-recipe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(recipeData),
+      });
+      
+      console.log('Response status:', response.status);
+      const result = await response.json();
+      console.log('Response data:', result);
+      
+      if (response.ok) {
+        Alert.alert('Success', 'Recipe added to favorites!');
+        setShowResultModal(false);
+      } else {
+        Alert.alert('Error', result.detail || result.error || 'Unable to save recipe.');
+      }
+    } catch (error) {
+      console.error('Error saving favorite:', error);
+      Alert.alert('Error', 'Unable to save to favorites. Please try again.');
+    } finally {
+      setIsSavingFavorite(false);
     }
   };
 
@@ -161,28 +253,8 @@ export default function CameraScreen() {
         {isAnalyzing && (
           <View style={styles.analyzingSection}>
             <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.analyzingText}>Đang phân tích ảnh với AI...</Text>
+            <Text style={styles.analyzingText}>Analyzing...</Text>
           </View>
-        )}
-
-        {analysisResult && !isAnalyzing && (
-          <ScrollView style={styles.resultSection} showsVerticalScrollIndicator={false}>
-            <Text style={styles.resultTitle}>{analysisResult.dish_name}</Text>
-            {analysisResult.description && (
-              <Text style={styles.resultDescription}>{analysisResult.description}</Text>
-            )}
-            
-            {analysisResult.ingredients && (
-              <View style={styles.ingredientsSection}>
-                <Text style={styles.sectionTitle}>Nguyên liệu:</Text>
-                {analysisResult.ingredients.map((ing: any, index: number) => (
-                  <Text key={index} style={styles.ingredientItem}>
-                    • {ing.name}: {ing.quantity} {ing.unit}
-                  </Text>
-                ))}
-              </View>
-            )}
-          </ScrollView>
         )}
 
         <View style={styles.controls}>
@@ -191,7 +263,7 @@ export default function CameraScreen() {
             onPress={toggleCameraFacing}
             disabled={isDetecting || isAnalyzing}>
             <Rotate3D size={20} color="#4CAF50" />
-            <Text style={styles.flipButtonText}>Lật</Text>
+            <Text style={styles.flipButtonText}>Flip</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -199,7 +271,7 @@ export default function CameraScreen() {
             onPress={handlePickImage}
             disabled={isDetecting || isAnalyzing}>
             <ImageIcon size={20} color="#4CAF50" />
-            <Text style={styles.pickButtonText}>Chọn ảnh</Text>
+            <Text style={styles.pickButtonText}>Pick Image</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -211,11 +283,114 @@ export default function CameraScreen() {
             disabled={isDetecting || isAnalyzing}>
             <Camera size={20} color="#FFFFFF" />
             <Text style={styles.detectButtonText}>
-              {isDetecting ? 'Đang chụp...' : 'Chụp'}
+              {isDetecting ? 'Taking photo...' : 'Take Photo'}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Result Modal */}
+      <Modal
+        visible={showResultModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowResultModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowResultModal(false)}>
+              <X size={24} color="#666666" />
+            </TouchableOpacity>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {analysisResult && (
+                <>
+                  {/* Display Image */}
+                  {analysisResult.image_url && (
+                    <Image 
+                      source={{ uri: analysisResult.image_url }} 
+                      style={styles.modalImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  
+                  <Text style={styles.modalTitle}>
+                    {analysisResult.name}
+                    {analysisResult.name_local && (
+                      <Text style={styles.modalTitleLocal}> ({analysisResult.name_local})</Text>
+                    )}
+                  </Text>
+                  
+                  {analysisResult.description && (
+                    <Text style={styles.modalDescription}>{analysisResult.description}</Text>
+                  )}
+                  
+                  {analysisResult.ingredients && analysisResult.ingredients.length > 0 && (
+                    <View style={styles.modalIngredientsSection}>
+                      <Text style={styles.modalSectionTitle}>Ingredients:</Text>
+                      {analysisResult.ingredients.map((ing: string, index: number) => (
+                        <Text key={index} style={styles.modalIngredientItem}>
+                          • {ing}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {analysisResult.instructions && analysisResult.instructions.length > 0 && (
+                    <View style={styles.modalInstructionsSection}>
+                      <Text style={styles.modalSectionTitle}>Instructions:</Text>
+                      {analysisResult.instructions.map((step: string, index: number) => (
+                        <Text key={index} style={styles.modalInstructions}>
+                          {index + 1}. {step}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {analysisResult.cookings_time && (
+                    <Text style={styles.modalInfo}>
+                      ⏱️ Cooking time: {analysisResult.cookings_time} minutes
+                    </Text>
+                  )}
+
+                  {analysisResult.servings && (
+                    <Text style={styles.modalInfo}>
+                      👥 Servings: {analysisResult.servings}
+                    </Text>
+                  )}
+
+                  {analysisResult.calories && (
+                    <Text style={styles.modalInfo}>
+                      🔥 Calories: {analysisResult.calories} kcal
+                    </Text>
+                  )}
+
+                  {analysisResult.difficulty && (
+                    <Text style={styles.modalInfo}>
+                      📊 Difficulty: {analysisResult.difficulty}
+                    </Text>
+                  )}
+                </>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.favoriteButton, isSavingFavorite && styles.favoriteButtonDisabled]}
+              onPress={handleAddToFavorite}
+              disabled={isSavingFavorite}>
+              {isSavingFavorite ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Heart size={20} color="#FFFFFF" fill="#FFFFFF" />
+                  <Text style={styles.favoriteButtonText}>Add to Favorite</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -451,5 +626,107 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxHeight: height * 0.8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 1,
+    padding: 4,
+  },
+  modalImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333333',
+    marginBottom: 12,
+    paddingRight: 32,
+  },
+  modalTitleLocal: {
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  modalIngredientsSection: {
+    marginBottom: 16,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  modalIngredientItem: {
+    fontSize: 14,
+    color: '#555555',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  modalInstructionsSection: {
+    marginBottom: 16,
+  },
+  modalInstructions: {
+    fontSize: 14,
+    color: '#555555',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  modalInfo: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  favoriteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF6B6B',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  favoriteButtonDisabled: {
+    opacity: 0.6,
+  },
+  favoriteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

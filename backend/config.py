@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
     supabase_service_key: str
-    
+
     # Gemini AI
     gemini_api_key: str
     
@@ -25,7 +25,11 @@ class Settings(BaseSettings):
     
     # CORS
     allowed_origins: str = "http://localhost:8081"
-    
+
+    # Spoonacular API Key (optional)
+    spoonacular_api_key: str 
+
+
     class Config:
         env_file = str(BASE_DIR / ".env")
         case_sensitive = False
