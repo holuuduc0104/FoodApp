@@ -4,8 +4,17 @@ from database import get_supabase_client
 from supabase import Client
 from typing import List, Optional
 from datetime import datetime
+import httpx
+from config import get_settings
+import time
 
 router = APIRouter()
+settings = get_settings()
+
+# Simple cache for NewsAPI results (5 minutes TTL)
+_news_cache: dict = {}
+CACHE_TTL = 300  # 5 minutes
+MAX_PAGE_SIZE = 100  # NewsAPI max per request
 
 
 class ArticleResponse(BaseModel):
@@ -18,6 +27,9 @@ class ArticleResponse(BaseModel):
     date: str
     read_time: Optional[str] = None
     featured: bool = False
+    author: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
 
 
 class ArticleCreate(BaseModel):
@@ -30,34 +42,193 @@ class ArticleCreate(BaseModel):
     featured: bool = False
 
 
-@router.get("/", response_model=List[ArticleResponse])
+async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: int = 20):
+    """Fetch articles from NewsAPI with caching and pagination
+    
+    Uses food-focused query to get relevant culinary news only.
+    """
+    global _news_cache
+    
+    # Food-focused search query - more specific to get relevant results
+    # Using quotes for exact phrases and combining with food-related terms
+    food_query = (
+        '("food" OR "recipe" OR "cooking" OR "chef" OR "restaurant" OR "cuisine" OR '
+        '"nutrition" OR "meal" OR "dish" OR "ingredient" OR "kitchen" OR "culinary" OR '
+        '"baking" OR "gourmet" OR "diet" OR "healthy eating" OR "food trend")'
+    )
+    
+    search_query = query if query else food_query
+    cache_key = f"{search_query}_{page}_{page_size}"
+    current_time = time.time()
+    
+    # Check cache first
+    if cache_key in _news_cache:
+        cached = _news_cache[cache_key]
+        if (current_time - cached["timestamp"]) < CACHE_TTL:
+            print(f"Returning cached NewsAPI data for page {page}")
+            return cached["data"], cached["total"]
+    
+    try:
+        print(f"Fetching fresh data from NewsAPI (page {page})...")
+        async with httpx.AsyncClient() as client:
+            url = "https://newsapi.org/v2/everything"
+            params = {
+                "q": search_query,
+                "apiKey": settings.newsapi_key,
+                "language": "en",
+                "sortBy": "publishedAt",
+                "pageSize": min(page_size + 10, MAX_PAGE_SIZE),  # Request extra to filter invalid
+                "page": page,
+                # Add domains for food-focused sources (optional but helps)
+                # "domains": "foodnetwork.com,bonappetit.com,seriouseats.com,eater.com"
+            }
+            response = await client.get(url, params=params, timeout=30.0)
+            
+            if response.status_code != 200:
+                error_msg = response.json().get("message", "Unknown error")
+                print(f"NewsAPI error: {response.status_code} - {error_msg}")
+                return [], 0
+            
+            data = response.json()
+            total_results = data.get("totalResults", 0)
+            articles = []
+            
+            for idx, article in enumerate(data.get("articles", [])):
+                # Skip articles without required fields or with [Removed] content
+                title = article.get("title")
+                description = article.get("description")
+                image_url = article.get("urlToImage")
+                
+                if not title or not description or not image_url:
+                    continue
+                    
+                if title == "[Removed]" or description == "[Removed]":
+                    continue
+                
+                # Create unique ID based on page and index
+                unique_id = f"news_p{page}_{idx}_{article.get('publishedAt', '')}"
+                    
+                articles.append({
+                    "id": unique_id,
+                    "title": title,
+                    "description": description,
+                    "content": article.get("content", ""),
+                    "image_url": image_url,
+                    "category": "news",
+                    "date": article.get("publishedAt", "")[:10] if article.get("publishedAt") else "",
+                    "read_time": "5 phút",
+                    "featured": page == 1 and len(articles) < 3,  # Only first page has featured
+                    "author": article.get("author", "NewsAPI"),
+                    "source": article.get("source", {}).get("name", "Unknown"),
+                    "url": article.get("url", "")
+                })
+                
+                # Stop when we have enough valid articles
+                if len(articles) >= page_size:
+                    break
+            
+            # Update cache
+            _news_cache[cache_key] = {
+                "data": articles,
+                "total": total_results,
+                "timestamp": current_time
+            }
+            print(f"Cached {len(articles)} articles from NewsAPI (page {page}, total: {total_results})")
+            
+            return articles, total_results
+    except Exception as e:
+        print(f"Error fetching NewsAPI: {e}")
+        # Return cached data even if expired, better than nothing
+        if cache_key in _news_cache:
+            print("Returning stale cached data due to error")
+            cached = _news_cache[cache_key]
+            return cached["data"], cached["total"]
+        return [], 0
+
+
+class PaginatedArticlesResponse(BaseModel):
+    articles: List[ArticleResponse]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
+
+@router.get("/", response_model=PaginatedArticlesResponse)
 async def get_articles(
     category: Optional[str] = None,
     featured: Optional[bool] = None,
-    limit: int = 20,
+    page: int = 1,
+    page_size: int = 20,
+    source: str = "newsapi",  # "newsapi" or "supabase"
     supabase: Client = Depends(get_supabase_client)
 ):
-    """Get all articles with optional filtering"""
+    """Get all articles with optional filtering and pagination"""
     try:
-        query = supabase.table("articles").select("*")
+        # Validate pagination params
+        page = max(1, page)
+        page_size = min(max(1, page_size), MAX_PAGE_SIZE)
         
-        if category:
-            query = query.eq("category", category)
-        
-        if featured is not None:
-            query = query.eq("featured", featured)
-        
-        response = query.order("created_at", desc=True).limit(limit).execute()
-        
-        # Format the response
-        articles = []
-        for article in response.data:
-            articles.append({
-                **article,
-                "date": article.get("created_at", "")[:10] if article.get("created_at") else ""
-            })
-        
-        return articles
+        if source == "newsapi":
+            # Fetch from NewsAPI with pagination
+            articles, total = await fetch_newsapi_articles(page=page, page_size=page_size)
+            
+            # Apply filters
+            if category and category != "news":
+                articles = [a for a in articles if a["category"] == category]
+            
+            if featured is not None:
+                articles = [a for a in articles if a["featured"] == featured]
+            
+            return {
+                "articles": articles,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "has_more": page * page_size < total
+            }
+        else:
+            # Fetch from Supabase (original logic) with pagination
+            offset = (page - 1) * page_size
+            
+            # Get total count first
+            count_query = supabase.table("articles").select("id", count="exact")
+            if category:
+                count_query = count_query.eq("category", category)
+            if featured is not None:
+                count_query = count_query.eq("featured", featured)
+            count_response = count_query.execute()
+            total = count_response.count or 0
+            
+            # Get paginated data
+            query = supabase.table("articles").select("*")
+            
+            if category:
+                query = query.eq("category", category)
+            
+            if featured is not None:
+                query = query.eq("featured", featured)
+            
+            response = query.order("created_at", desc=True).range(offset, offset + page_size - 1).execute()
+            
+            # Format the response
+            articles = []
+            for article in response.data:
+                articles.append({
+                    **article,
+                    "date": article.get("created_at", "")[:10] if article.get("created_at") else "",
+                    "author": None,
+                    "source": "FoodApp",
+                    "url": None
+                })
+            
+            return {
+                "articles": articles,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "has_more": page * page_size < total
+            }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -65,20 +236,29 @@ async def get_articles(
 @router.get("/featured", response_model=List[ArticleResponse])
 async def get_featured_articles(
     limit: int = 5,
+    source: str = "newsapi",
     supabase: Client = Depends(get_supabase_client)
 ):
     """Get featured articles"""
     try:
-        response = supabase.table("articles").select("*").eq("featured", True).order("created_at", desc=True).limit(limit).execute()
-        
-        articles = []
-        for article in response.data:
-            articles.append({
-                **article,
-                "date": article.get("created_at", "")[:10] if article.get("created_at") else ""
-            })
-        
-        return articles
+        if source == "newsapi":
+            articles, _ = await fetch_newsapi_articles(page=1, page_size=10)
+            featured = [a for a in articles if a["featured"]]
+            return featured[:limit]
+        else:
+            response = supabase.table("articles").select("*").eq("featured", True).order("created_at", desc=True).limit(limit).execute()
+            
+            articles = []
+            for article in response.data:
+                articles.append({
+                    **article,
+                    "date": article.get("created_at", "")[:10] if article.get("created_at") else "",
+                    "author": None,
+                    "source": "FoodApp",
+                    "url": None
+                })
+            
+            return articles
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

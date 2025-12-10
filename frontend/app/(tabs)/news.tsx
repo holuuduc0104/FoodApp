@@ -1,117 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
-  ScrollView, 
+  FlatList,
+  ScrollView,
   Image, 
   TouchableOpacity, 
   RefreshControl,
-  Dimensions 
+  Dimensions,
+  ActivityIndicator,
+  Alert 
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Calendar, Clock, ChevronRight, Newspaper, Star } from 'lucide-react-native';
+import { Calendar, Clock, ChevronRight, Newspaper, Star, ExternalLink } from 'lucide-react-native';
+import { fetchArticles, Article } from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
-const API_URL = 'http://192.168.1.109:8000'; // Update with your backend IP
-
-// Mock articles data
-const mockArticles = [
-  {
-    id: '1',
-    title: '10 Món Ăn Healthy Cho Mùa Hè',
-    description: 'Khám phá những món ăn thanh mát, bổ dưỡng giúp bạn giải nhiệt trong những ngày hè nóng bức.',
-    image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&h=400&fit=crop',
-    category: 'Bài viết',
-    date: '05/12/2025',
-    readTime: '5 phút',
-    featured: true,
-  },
-  {
-    id: '2',
-    title: 'Sự Kiện Ẩm Thực Đường Phố 2025',
-    description: 'Tham gia sự kiện ẩm thực đường phố lớn nhất năm tại TP.HCM với hơn 100 gian hàng.',
-    image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&h=400&fit=crop',
-    category: 'Sự kiện',
-    date: '15/12/2025',
-    readTime: '3 phút',
-    featured: true,
-  },
-  {
-    id: '3',
-    title: 'Bí Quyết Nấu Phở Ngon Chuẩn Vị',
-    description: 'Học cách nấu phở bò thơm ngon với công thức gia truyền từ đầu bếp chuyên nghiệp.',
-    image: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&h=400&fit=crop',
-    category: 'Tin tức',
-    date: '03/12/2025',
-    readTime: '8 phút',
-    featured: false,
-  },
-  {
-    id: '4',
-    title: 'Xu Hướng Ẩm Thực 2025',
-    description: 'Những xu hướng ẩm thực mới nhất đang được giới trẻ yêu thích trong năm 2025.',
-    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&h=400&fit=crop',
-    category: 'Tin tức',
-    date: '01/12/2025',
-    readTime: '6 phút',
-    featured: false,
-  },
-  {
-    id: '5',
-    title: 'Workshop: Làm Bánh Mì Việt Nam',
-    description: 'Đăng ký ngay workshop học làm bánh mì Việt Nam với nguyên liệu tươi ngon.',
-    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=400&fit=crop',
-    category: 'Sự kiện',
-    date: '20/12/2025',
-    readTime: '2 phút',
-    featured: false,
-  },
-  {
-    id: '6',
-    title: 'Dinh Dưỡng Cho Người Tập Gym',
-    description: 'Chế độ ăn khoa học giúp tăng cơ, giảm mỡ hiệu quả cho người tập gym.',
-    image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=600&h=400&fit=crop',
-    category: 'Bài viết',
-    date: '28/11/2025',
-    readTime: '7 phút',
-    featured: false,
-  },
-];
-
-type Article = {
-  id: string;
-  title: string;
-  description: string;
-  image: string;
-  category: string;
-  date: string;
-  readTime: string;
-  featured: boolean;
-};
-
 const getCategoryColor = (category: string) => {
-  switch (category) {
-    case 'Bài viết':
+  switch (category.toLowerCase()) {
+    case 'article':
+    case 'bài viết':
       return '#2D6A4F';
-    case 'Sự kiện':
+    case 'event':
+    case 'sự kiện':
       return '#FF6B35';
-    case 'Tin tức':
+    case 'news':
+    case 'tin tức':
       return '#3B82F6';
     default:
       return '#95A99C';
   }
 };
 
+const getCategoryName = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'article':
+      return 'Bài viết';
+    case 'event':
+      return 'Sự kiện';
+    case 'news':
+      return 'Tin tức';
+    default:
+      return category;
+  }
+};
+
 function FeaturedCard({ article, onPress }: { article: Article; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.featuredCard} onPress={onPress} activeOpacity={0.9}>
-      <Image source={{ uri: article.image }} style={styles.featuredImage} />
+      <Image source={{ uri: article.image_url || article.image_url }} style={styles.featuredImage} />
       <View style={styles.featuredOverlay} />
       <View style={styles.featuredContent}>
         <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(article.category) }]}>
-          <Text style={styles.categoryText}>{article.category}</Text>
+          <Text style={styles.categoryText}>{getCategoryName(article.category)}</Text>
         </View>
         <Text style={styles.featuredTitle} numberOfLines={2}>{article.title}</Text>
         <Text style={styles.featuredDescription} numberOfLines={2}>{article.description}</Text>
@@ -120,10 +63,17 @@ function FeaturedCard({ article, onPress }: { article: Article; onPress: () => v
             <Calendar size={12} color="#FFFFFF" />
             <Text style={styles.featuredMetaText}>{article.date}</Text>
           </View>
-          <View style={styles.metaItem}>
-            <Clock size={12} color="#FFFFFF" />
-            <Text style={styles.featuredMetaText}>{article.readTime}</Text>
-          </View>
+          {article.read_time && (
+            <View style={styles.metaItem}>
+              <Clock size={12} color="#FFFFFF" />
+              <Text style={styles.featuredMetaText}>{article.read_time}</Text>
+            </View>
+          )}
+          {article.source && (
+            <View style={styles.metaItem}>
+              <Text style={styles.featuredMetaText}>• {article.source}</Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -133,11 +83,11 @@ function FeaturedCard({ article, onPress }: { article: Article; onPress: () => v
 function ArticleCard({ article, onPress }: { article: Article; onPress: () => void }) {
   return (
     <TouchableOpacity style={styles.articleCard} onPress={onPress} activeOpacity={0.8}>
-      <Image source={{ uri: article.image }} style={styles.articleImage} />
+      <Image source={{ uri: article.image_url || article.image_url }} style={styles.articleImage} />
       <View style={styles.articleContent}>
         <View style={[styles.smallCategoryBadge, { backgroundColor: getCategoryColor(article.category) + '20' }]}>
           <Text style={[styles.smallCategoryText, { color: getCategoryColor(article.category) }]}>
-            {article.category}
+            {getCategoryName(article.category)}
           </Text>
         </View>
         <Text style={styles.articleTitle} numberOfLines={2}>{article.title}</Text>
@@ -147,13 +97,20 @@ function ArticleCard({ article, onPress }: { article: Article; onPress: () => vo
             <Calendar size={11} color="#95A99C" />
             <Text style={styles.articleMetaText}>{article.date}</Text>
           </View>
-          <View style={styles.metaItem}>
-            <Clock size={11} color="#95A99C" />
-            <Text style={styles.articleMetaText}>{article.readTime}</Text>
-          </View>
+          {article.read_time && (
+            <View style={styles.metaItem}>
+              <Clock size={11} color="#95A99C" />
+              <Text style={styles.articleMetaText}>{article.read_time}</Text>
+            </View>
+          )}
+          {article.source && (
+            <View style={styles.metaItem}>
+              <Text style={styles.articleMetaText}>• {article.source}</Text>
+            </View>
+          )}
         </View>
       </View>
-      <ChevronRight size={20} color="#95A99C" />
+      {article.url ? <ExternalLink size={18} color="#95A99C" /> : <ChevronRight size={20} color="#95A99C" />}
     </TouchableOpacity>
   );
 }
@@ -161,36 +118,167 @@ function ArticleCard({ article, onPress }: { article: Article; onPress: () => vo
 export default function NewsScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const [articles, setArticles] = useState<Article[]>(mockArticles);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Tất cả');
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalArticles, setTotalArticles] = useState(0);
 
-  const categories = ['Tất cả', 'Bài viết', 'Sự kiện', 'Tin tức'];
+  const PAGE_SIZE = 15;
+
+  const categories = [
+    { key: 'all', label: 'Tất cả' },
+    { key: 'news', label: 'Tin tức' },
+  ];
+
+  useEffect(() => {
+    loadArticles();
+  }, []);
+
+  const loadArticles = async (page: number = 1, append: boolean = false) => {
+    try {
+      if (page === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      // Try NewsAPI first
+      try {
+        const response = await fetchArticles('newsapi', undefined, undefined, page, PAGE_SIZE);
+        if (response && response.articles.length > 0) {
+          if (append) {
+            setArticles(prev => [...prev, ...response.articles]);
+          } else {
+            setArticles(response.articles);
+          }
+          setHasMore(response.has_more);
+          setTotalArticles(response.total);
+          setCurrentPage(page);
+          return;
+        }
+      } catch (newsApiError) {
+        console.log('NewsAPI failed, trying Supabase fallback...');
+      }
+      
+      // Fallback to Supabase if NewsAPI fails
+      const fallbackResponse = await fetchArticles('supabase', undefined, undefined, page, PAGE_SIZE);
+      if (append) {
+        setArticles(prev => [...prev, ...fallbackResponse.articles]);
+      } else {
+        setArticles(fallbackResponse.articles);
+      }
+      setHasMore(fallbackResponse.has_more);
+      setTotalArticles(fallbackResponse.total);
+      setCurrentPage(page);
+      
+      if (!append && fallbackResponse.articles.length === 0) {
+        Alert.alert('Thông báo', 'Không có tin tức. Vui lòng thử lại sau.');
+      }
+    } catch (error: any) {
+      console.error('Error loading articles:', error);
+      if (!append) {
+        Alert.alert(
+          'Lỗi',
+          'Không thể tải tin tức. Kiểm tra kết nối mạng và backend server.',
+          [{ text: 'Thử lại', onPress: () => loadArticles() }, { text: 'Đóng' }]
+        );
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMoreArticles = useCallback(() => {
+    if (!loadingMore && hasMore && !loading) {
+      loadArticles(currentPage + 1, true);
+    }
+  }, [loadingMore, hasMore, loading, currentPage]);
 
   const featuredArticles = articles.filter(a => a.featured);
   const regularArticles = articles.filter(a => !a.featured);
 
-  const filteredArticles = selectedCategory === 'Tất cả' 
+  const filteredArticles = selectedCategory === 'all' 
     ? regularArticles 
     : regularArticles.filter(a => a.category === selectedCategory);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Fetch from API
-    // try {
-    //   const response = await fetch(`${API_URL}/api/articles`);
-    //   const data = await response.json();
-    //   setArticles(data);
-    // } catch (error) {
-    //   console.error('Error fetching articles:', error);
-    // }
-    setTimeout(() => setRefreshing(false), 1000);
+    setCurrentPage(1);
+    setHasMore(true);
+    await loadArticles(1, false);
+    setRefreshing(false);
   };
 
-  const handleArticlePress = (article: Article) => {
-    // TODO: Navigate to article detail
-    console.log('Article pressed:', article.id);
-    // router.push(`/article/${article.id}` as any);
+  const handleArticlePress = async (article: Article) => {
+    // Navigate to article detail page with article data
+    router.push({
+      pathname: `/article/[id]`,
+      params: {
+        id: article.id,
+        article: JSON.stringify(article),
+      },
+    } as any);
   };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.loadMoreContainer}>
+        <ActivityIndicator size="small" color="#2D6A4F" />
+        <Text style={styles.loadMoreText}>Đang tải thêm...</Text>
+      </View>
+    );
+  };
+
+  const renderHeader = () => (
+    <>
+      {/* Featured Section */}
+      {selectedCategory === 'all' && featuredArticles.length > 0 && (
+        <View style={styles.featuredSection}>
+          <View style={styles.sectionHeader}>
+            <Star size={18} color="#FF6B35" />
+            <Text style={styles.sectionTitle}>Nổi bật</Text>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.featuredScroll}
+          >
+            {featuredArticles.map((article) => (
+              <FeaturedCard 
+                key={article.id} 
+                article={article} 
+                onPress={() => handleArticlePress(article)} 
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Section Title */}
+      <View style={styles.articlesSection}>
+        <View style={styles.articlesSectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {selectedCategory === 'all' ? 'Tất cả bài viết' : categories.find(c => c.key === selectedCategory)?.label}
+          </Text>
+          {totalArticles > 0 && (
+            <Text style={styles.totalCount}>({totalArticles} bài)</Text>
+          )}
+        </View>
+      </View>
+    </>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Newspaper size={48} color="#95A99C" />
+      <Text style={styles.emptyText}>Chưa có bài viết nào</Text>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -207,75 +295,53 @@ export default function NewsScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categories.map((category) => (
             <TouchableOpacity
-              key={category}
+              key={category.key}
               style={[
                 styles.categoryButton,
-                selectedCategory === category && styles.categoryButtonActive
+                selectedCategory === category.key && styles.categoryButtonActive
               ]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => {
+                setSelectedCategory(category.key);
+              }}
             >
               <Text style={[
                 styles.categoryButtonText,
-                selectedCategory === category && styles.categoryButtonTextActive
+                selectedCategory === category.key && styles.categoryButtonTextActive
               ]}>
-                {category}
+                {category.label}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2D6A4F']} />
-        }
-      >
-        {/* Featured Section */}
-        {selectedCategory === 'Tất cả' && featuredArticles.length > 0 && (
-          <View style={styles.featuredSection}>
-            <View style={styles.sectionHeader}>
-              <Star size={18} color="#FF6B35" />
-              <Text style={styles.sectionTitle}>Nổi bật</Text>
-            </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.featuredScroll}
-            >
-              {featuredArticles.map((article) => (
-                <FeaturedCard 
-                  key={article.id} 
-                  article={article} 
-                  onPress={() => handleArticlePress(article)} 
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Regular Articles */}
-        <View style={styles.articlesSection}>
-          <Text style={styles.sectionTitle}>
-            {selectedCategory === 'Tất cả' ? 'Tất cả bài viết' : selectedCategory}
-          </Text>
-          {filteredArticles.map((article) => (
-            <ArticleCard 
-              key={article.id} 
-              article={article} 
-              onPress={() => handleArticlePress(article)} 
-            />
-          ))}
-          {filteredArticles.length === 0 && (
-            <View style={styles.emptyState}>
-              <Newspaper size={48} color="#95A99C" />
-              <Text style={styles.emptyText}>Chưa có bài viết nào</Text>
-            </View>
-          )}
+      {loading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#2D6A4F" />
+          <Text style={styles.loadingText}>Đang tải tin tức...</Text>
         </View>
-      </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredArticles}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ArticleCard 
+              article={item} 
+              onPress={() => handleArticlePress(item)} 
+            />
+          )}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmptyState}
+          onEndReached={loadMoreArticles}
+          onEndReachedThreshold={0.3}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2D6A4F']} />
+          }
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.flatListContent}
+        />
+      )}
     </View>
   );
 }
@@ -331,10 +397,7 @@ const styles = StyleSheet.create({
   categoryButtonTextActive: {
     color: '#FFFFFF',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  flatListContent: {
     paddingBottom: 24,
   },
   featuredSection: {
@@ -351,8 +414,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1B4332',
-    paddingHorizontal: 16,
-    marginBottom: 12,
   },
   featuredScroll: {
     paddingHorizontal: 16,
@@ -418,6 +479,18 @@ const styles = StyleSheet.create({
   },
   articlesSection: {
     marginTop: 20,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  articlesSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  totalCount: {
+    fontSize: 14,
+    color: '#95A99C',
+    fontWeight: '400',
   },
   articleCard: {
     flexDirection: 'row',
@@ -485,5 +558,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#95A99C',
     marginTop: 12,
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#95A99C',
+    marginTop: 12,
+  },
+  loadMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    color: '#2D6A4F',
   },
 });

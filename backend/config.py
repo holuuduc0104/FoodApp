@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     # Gemini AI
     gemini_api_key: str
     
+    # NewsAPI
+    newsapi_key: str
+    
     # API
     api_host: str = "0.0.0.0"
     api_port: int = 8000

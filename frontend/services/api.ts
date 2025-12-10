@@ -1,6 +1,29 @@
 // API Service for FoodApp
 
-const API_BASE_URL = 'http://192.168.1.30:8000/api';
+const API_BASE_URL = 'http://192.168.1.166:8000/api';
+
+export interface Article {
+  id: string;
+  title: string;
+  description: string;
+  content?: string;
+  image_url?: string;
+  category: string;
+  date: string;
+  read_time?: string;
+  featured: boolean;
+  author?: string;
+  source?: string;
+  url?: string;
+}
+
+export interface PaginatedArticlesResponse {
+  articles: Article[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
 
 export interface AnalyzeFoodResponse {
   success: boolean;
@@ -119,5 +142,86 @@ export async function detectIngredients(imageUri: string): Promise<DetectIngredi
   } catch (error) {
     console.error('Error detecting ingredients:', error);
     throw error;
+  }
+}
+
+/**
+ * Fetch articles from backend (NewsAPI or Supabase) with pagination
+ */
+export async function fetchArticles(
+  source: 'newsapi' | 'supabase' = 'newsapi',
+  category?: string,
+  featured?: boolean,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PaginatedArticlesResponse> {
+  try {
+    const params = new URLSearchParams({
+      source,
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    });
+    
+    if (category) params.append('category', category);
+    if (featured !== undefined) params.append('featured', featured.toString());
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout for pagination
+
+    const response = await fetch(`${API_BASE_URL}/articles?${params.toString()}`, {
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: PaginatedArticlesResponse = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching articles:', error);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - Kiểm tra kết nối mạng');
+    }
+    throw new Error(error.message || 'Không thể kết nối tới server');
+  }
+}
+
+/**
+ * Fetch featured articles
+ */
+export async function fetchFeaturedArticles(
+  source: 'newsapi' | 'supabase' = 'newsapi',
+  limit: number = 5
+): Promise<Article[]> {
+  try {
+    const params = new URLSearchParams({
+      source,
+      limit: limit.toString(),
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    const response = await fetch(`${API_BASE_URL}/articles/featured?${params.toString()}`, {
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const articles = await response.json();
+    return articles;
+  } catch (error: any) {
+    console.error('Error fetching featured articles:', error);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - Kiểm tra kết nối mạng');
+    }
+    throw new Error(error.message || 'Không thể kết nối tới server');
   }
 }
