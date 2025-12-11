@@ -41,14 +41,14 @@ export default function HomeScreen() {
 
           
           {/* User info + logout */}
-          {email && (
+          {/* {email && (
             <View style={styles.userInfo}>
               <Text style={styles.userEmail}>{email}</Text>
               <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
                 <LogOut size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-          )}
+          )} */}
         </View>
 
         <Text style={styles.headerSubtitle}>Recommendation</Text>
