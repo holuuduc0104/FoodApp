@@ -431,11 +431,11 @@ export default function RecipeDetailScreen() {
                 {ingredient.original.trim()}
               </Text>
             ) : null}
-            {ingredient.amount && ingredient.unit && (
+            {ingredient.amount !== undefined && ingredient.amount !== null && typeof ingredient.unit === 'string' && ingredient.unit.trim() ? (
               <Text style={styles.ingredientAmount}>
-                {ingredient.amount} {ingredient.unit}
+                {String(ingredient.amount)} {ingredient.unit.trim()}
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
         <View style={[styles.ingredientBadge, { backgroundColor: typeInfo.color }]}>
@@ -452,7 +452,7 @@ export default function RecipeDetailScreen() {
           <ArrowLeft size={28} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recipe Details</Text>
-        <TouchableOpacity onPress={handleAddToFavorite}> {/* Gọi handleAddToFavorite để xử lý cả add/remove */}
+        <TouchableOpacity onPress={handleAddToFavorite}>
           <Heart
             size={28}
             color={isFavorite ? '#FFFFFF' : '#FFE0CC'}
@@ -570,7 +570,7 @@ export default function RecipeDetailScreen() {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Heart size={20} color="#FFFFFF" fill={isFavorite ? '#FFFFFF' : 'transparent'} /> {/* Heart icon filled based on isFavorite state */}
+              <Heart size={20} color="#FFFFFF" fill={isFavorite ? '#FFFFFF' : 'transparent'} />
               <Text style={styles.addToFavoriteText}>{isFavorite ? 'Remove From Favorite' : 'Add To Favorite'}</Text>
             </>
           )}

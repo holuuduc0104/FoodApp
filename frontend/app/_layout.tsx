@@ -9,13 +9,15 @@ export default function RootLayout() {
   useFrameworkReady();
 
   return (
-    <AuthProvider> {/* Thêm AuthProvider ở đây */}
-      <IngredientsProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </IngredientsProvider>
-    </AuthProvider>
+    <>
+      <AuthProvider>
+        <IngredientsProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="+not-found" />
+          </Stack>
+        </IngredientsProvider>
+      </AuthProvider>
+      <StatusBar style="auto" />
+    </>
   );
 }
