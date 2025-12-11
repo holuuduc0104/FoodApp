@@ -42,77 +42,109 @@ class ArticleCreate(BaseModel):
     featured: bool = False
 
 
-async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: int = 20):
+async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: int = 50):
     """Fetch articles from NewsAPI with caching and pagination
     
     Uses food-focused query to get relevant culinary news only.
+    Fetches multiple API pages if needed to fill requested page_size.
     """
     global _news_cache
     
-    # Food-focused search query - very specific to get only food/cooking related results
-    food_query = '"recipe" OR "restaurant" OR "chef" OR "cooking tips" OR "food review"'
+    # Food-focused search query - specific food terms
+    food_query = '"recipe" OR "restaurant" OR "cooking" OR "chef" OR "cuisine" OR "food review" OR "dining"'
     
     # Keywords that MUST be present (at least one) - strong food indicators
     FOOD_MUST_KEYWORDS = [
+        # Cooking & Recipes
         'recipe', 'recipes', 'cooking', 'cook', 'chef', 'chefs',
-        'restaurant', 'restaurants', 'cuisine', 'cuisines',
-        'dish', 'dishes', 'meal', 'meals', 'menu',
-        'ingredient', 'ingredients', 'kitchen',
         'baking', 'bake', 'baker', 'bakery',
-        'gourmet', 'culinary', 'gastronomy',
-        'breakfast', 'lunch', 'dinner', 'brunch',
-        'dessert', 'appetizer', 'entree', 'soup', 'salad',
-        'pasta', 'pizza', 'burger', 'sandwich', 'sushi', 'noodle',
-        'steak', 'seafood', 'vegetarian', 'vegan',
-        'michelin', 'foodie', 'bistro', 'cafe', 'diner',
-        'delicious', 'tasty', 'yummy', 'flavor', 'flavour',
-        'grilled', 'roasted', 'fried', 'steamed', 'baked',
-        'homemade', 'food truck', 'street food', 'fine dining',
+        'grilled', 'roasted', 'fried', 'steamed', 'baked', 'sauteed',
+        'homemade', 'home-cooked',
+        
+        # Restaurant & Dining
+        'restaurant', 'restaurants', 'dining', 'dine', 'eatery',
+        'michelin', 'bistro', 'cafe', 'cafeteria', 'diner',
+        'food truck', 'street food', 'fine dining', 'fast food',
+        
+        # Food & Dishes
+        'cuisine', 'cuisines', 'dish', 'dishes', 'meal', 'meals',
+        'food', 'foods', 'menu', 'appetizer', 'entree', 'dessert',
+        'breakfast', 'lunch', 'dinner', 'brunch', 'snack',
+        'soup', 'salad', 'pasta', 'pizza', 'burger', 'sandwich',
+        'sushi', 'noodle', 'steak', 'seafood', 'chicken', 'beef', 'pork',
         'taco', 'burrito', 'curry', 'stir fry', 'bbq', 'barbecue',
+        'bread', 'cake', 'pastry', 'cookies', 'ice cream',
+        
+        # Nutrition & Health
+        'nutrition', 'nutritious', 'nutritional', 'nutrient', 'nutrients',
+        'diet', 'dietary', 'dieting', 'healthy eating', 'health food',
+        'calories', 'calorie', 'protein', 'carbs', 'carbohydrate',
+        'vitamin', 'vitamins', 'mineral', 'minerals', 'fiber',
+        'organic food', 'superfood', 'whole food', 'plant-based',
+        'vegetarian', 'vegan', 'gluten-free', 'keto', 'paleo',
+        'weight loss food', 'low-fat', 'low-carb', 'high-protein',
+        
+        # Ingredients
+        'ingredient', 'ingredients', 'spice', 'spices', 'herb', 'herbs',
+        'vegetable', 'vegetables', 'fruit', 'fruits', 'meat', 'dairy',
+        
+        # Food Industry
+        'foodie', 'gourmet', 'culinary', 'gastronomy',
+        'food safety', 'food recall', 'food price', 'grocery',
+        'supermarket', 'food industry', 'food chain',
         'mcdonald', 'burger king', 'kfc', 'wendy', 'chipotle',
         'starbucks', 'dunkin', 'pizza hut', 'domino',
-        'food safety', 'food recall', 'food price', 'grocery',
-        'supermarket', 'food industry', 'food chain'
+        
+        # Taste & Flavor
+        'delicious', 'tasty', 'yummy', 'flavor', 'flavour', 'savory'
     ]
     
-    # Keywords that indicate NON-food content - must NOT be present
+    # Keywords that indicate NON-food content - comprehensive list
     NON_FOOD_KEYWORDS = [
-        'disney', 'magic kingdom', 'theme park', 'amusement',
-        'movie', 'film', 'actor', 'actress', 'hollywood', 'netflix', 'streaming',
-        'politics', 'election', 'president', 'congress', 'senate', 'democrat', 'republican',
-        'war', 'military', 'army', 'weapon', 'missile', 'ukraine', 'russia',
-        'bitcoin', 'crypto', 'cryptocurrency', 'stock market', 'wall street', 'nasdaq', 'dow jones',
-        'football', 'basketball', 'soccer', 'tennis', 'golf', 'nfl', 'nba', 'mlb', 'nhl',
-        'celebrity', 'kardashian', 'taylor swift', 'concert', 'album', 'spotify',
-        'katy perry', 'justin trudeau', 'justin bieber', 'beyonce', 'drake', 'kanye',
-        'piers morgan', 'nick fuentes', 'hili dialogue',
-        'video game', 'gaming', 'playstation', 'xbox', 'nintendo', 'esports', 'fortnite',
-        'iphone', 'android', 'software', 'app store', 'startup', 'silicon valley',
-        'elon musk', 'tesla', 'spacex', 'rocket', 'nasa', 'mars', 'astronaut',
-        'climate change', 'earthquake', 'hurricane', 'tornado', 'flood', 'wildfire',
-        'murder', 'crime', 'arrest', 'prison', 'court case', 'lawsuit', 'trial', 'verdict',
-        'investment', 'investor', 'hedge fund', 'ipo', 'merger', 'acquisition',
-        'refrigeration oils', 'market trends', 'industry outlook', 'global summit',
-        'liam neeson', 'pamela anderson', 'romance', 'dating', 'instagram official',
-        't lounge', 'lounge for december', 'black people', 'racism', 'racist'
+        # Politics
+        'election', 'congress', 'senate', 'democrat', 'republican',
+        'parliament', 'legislation', 'ballot', 'trump', 'biden', 'politician',
+        
+        # War & Military
+        'war', 'military', 'weapon', 'missile', 'ukraine', 'russia', 'gaza', 'israel',
+        'soldier', 'troops', 'combat', 'invasion', 'army', 'navy',
+        
+        # Finance & Crypto
+        'bitcoin', 'cryptocurrency', 'crypto', 'nasdaq', 'dow jones', 'stock market',
+        'hedge fund', 'ipo', 'trading', 'investor',
+        
+        # Sports (non-food)
+        'nfl', 'nba', 'mlb', 'nhl', 'world cup', 'championship', 'playoff',
+        'football', 'basketball', 'soccer', 'tennis', 'golf', 'olympics',
+        
+        # Gaming & Tech
+        'video game', 'playstation', 'xbox', 'fortnite', 'esports', 'nintendo',
+        'iphone', 'android', 'apple watch', 'samsung',
+        
+        # Entertainment
+        'movie', 'film', 'netflix', 'actor', 'actress', 'hollywood',
+        'concert', 'album', 'spotify', 'grammy', 'emmy', 'oscar',
+        
+        # Crime & Disaster
+        'murder', 'shooting', 'terrorism', 'homicide', 'robbery', 'assault',
+        'earthquake', 'hurricane', 'wildfire', 'flood',
+        
+        # Other
+        'spacex', 'nasa', 'rocket', 'mars', 'elon musk'
     ]
     
     def is_food_related(title: str, description: str) -> bool:
-        """Check if article is food-related based on title and description"""
+        """Check if article is STRICTLY food-related"""
         text = f"{title} {description}".lower()
         
-        # First check if any non-food keywords are present - reject immediately
-        for keyword in NON_FOOD_KEYWORDS:
-            if keyword in text:
-                return False
+        # MUST have at least one food keyword - strict requirement
+        has_food = any(keyword in text for keyword in FOOD_MUST_KEYWORDS)
+        if not has_food:
+            return False
         
-        # Then check if at least one food keyword is present - require match
-        for keyword in FOOD_MUST_KEYWORDS:
-            if keyword in text:
-                return True
-        
-        # No food keywords found - reject
-        return False
+        # Reject if has non-food keywords
+        has_non_food = any(keyword in text for keyword in NON_FOOD_KEYWORDS)
+        return not has_non_food
     
     search_query = query if query else food_query
     cache_key = f"{search_query}_{page}_{page_size}"
@@ -126,75 +158,85 @@ async def fetch_newsapi_articles(query: str = None, page: int = 1, page_size: in
             return cached["data"], cached["total"]
     
     try:
-        print(f"Fetching fresh data from NewsAPI (page {page})...")
+        print(f"Fetching fresh data from NewsAPI (page {page}, need {page_size} articles)...")
+        all_articles = []
+        api_page = page  # Start from requested page
+        max_api_pages = 10  # Fetch up to 10 API pages to get enough food articles
+        
         async with httpx.AsyncClient() as client:
-            url = "https://newsapi.org/v2/everything"
-            params = {
-                "q": search_query,
-                "apiKey": settings.newsapi_key,
-                "language": "en",
-                "sortBy": "publishedAt",
-                "pageSize": MAX_PAGE_SIZE,  # Request max to have more to filter
-                "page": page,
-            }
-            response = await client.get(url, params=params, timeout=30.0)
-            
-            if response.status_code != 200:
-                error_msg = response.json().get("message", "Unknown error")
-                print(f"NewsAPI error: {response.status_code} - {error_msg}")
-                return [], 0
-            
-            data = response.json()
-            total_results = data.get("totalResults", 0)
-            articles = []
-            
-            for idx, article in enumerate(data.get("articles", [])):
-                # Skip articles without required fields or with [Removed] content
-                title = article.get("title")
-                description = article.get("description")
-                image_url = article.get("urlToImage")
+            for api_attempt in range(max_api_pages):
+                url = "https://newsapi.org/v2/everything"
+                params = {
+                    "q": search_query,
+                    "apiKey": settings.newsapi_key,
+                    "language": "en",
+                    "sortBy": "publishedAt",
+                    "pageSize": MAX_PAGE_SIZE,  # Request max to have more to filter
+                    "page": api_page + api_attempt,
+                }
+                response = await client.get(url, params=params, timeout=30.0)
                 
-                if not title or not description or not image_url:
-                    continue
-                    
-                if title == "[Removed]" or description == "[Removed]":
-                    continue
-                
-                # Filter: Only include food-related articles
-                if not is_food_related(title, description):
-                    continue
-                
-                # Create unique ID based on page and index
-                unique_id = f"news_p{page}_{idx}_{article.get('publishedAt', '')}"
-                    
-                articles.append({
-                    "id": unique_id,
-                    "title": title,
-                    "description": description,
-                    "content": article.get("content", ""),
-                    "image_url": image_url,
-                    "category": "news",
-                    "date": article.get("publishedAt", "")[:10] if article.get("publishedAt") else "",
-                    "read_time": "5 phút",
-                    "featured": page == 1 and len(articles) < 3,  # Only first page has featured
-                    "author": article.get("author", "NewsAPI"),
-                    "source": article.get("source", {}).get("name", "Unknown"),
-                    "url": article.get("url", "")
-                })
-                
-                # Stop when we have enough valid articles
-                if len(articles) >= page_size:
+                if response.status_code != 200:
+                    error_msg = response.json().get("message", "Unknown error")
+                    print(f"NewsAPI error: {response.status_code} - {error_msg}")
                     break
+                
+                data = response.json()
+                total_results = data.get("totalResults", 0)
+                
+                for idx, article in enumerate(data.get("articles", [])):
+                    # Skip articles without required fields or with [Removed] content
+                    title = article.get("title")
+                    description = article.get("description")
+                    image_url = article.get("urlToImage")
+                    
+                    if not title or not description or not image_url:
+                        continue
+                        
+                    if title == "[Removed]" or description == "[Removed]":
+                        continue
+                    
+                    # Filter: Only include food-related articles
+                    if not is_food_related(title, description):
+                        continue
+                    
+                    # Create unique ID based on page and index
+                    unique_id = f"news_p{api_page + api_attempt}_{idx}_{article.get('publishedAt', '')}"
+                        
+                    all_articles.append({
+                        "id": unique_id,
+                        "title": title,
+                        "description": description,
+                        "content": article.get("content", ""),
+                        "image_url": image_url,
+                        "category": "news",
+                        "date": article.get("publishedAt", "")[:10] if article.get("publishedAt") else "",
+                        "read_time": "5 phút",
+                        "featured": page == 1 and len(all_articles) < 3,
+                        "author": article.get("author", "NewsAPI"),
+                        "source": article.get("source", {}).get("name", "Unknown"),
+                        "url": article.get("url", "")
+                    })
+                    
+                    # Stop when we have enough valid articles
+                    if len(all_articles) >= page_size:
+                        break
+                
+                # If we have enough articles, stop fetching more pages
+                if len(all_articles) >= page_size:
+                    break
+                    
+                print(f"Got {len(all_articles)} articles after API page {api_page + api_attempt}, need {page_size}")
             
             # Update cache
             _news_cache[cache_key] = {
-                "data": articles,
+                "data": all_articles[:page_size],
                 "total": total_results,
                 "timestamp": current_time
             }
-            print(f"Cached {len(articles)} articles from NewsAPI (page {page}, total: {total_results})")
+            print(f"Cached {len(all_articles[:page_size])} articles from NewsAPI (page {page}, total: {total_results})")
             
-            return articles, total_results
+            return all_articles[:page_size], total_results
     except Exception as e:
         print(f"Error fetching NewsAPI: {e}")
         # Return cached data even if expired, better than nothing
@@ -218,7 +260,7 @@ async def get_articles(
     category: Optional[str] = None,
     featured: Optional[bool] = None,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 30,  # Increased for more content
     source: str = "newsapi",  # "newsapi" or "supabase"
     supabase: Client = Depends(get_supabase_client)
 ):

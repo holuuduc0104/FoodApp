@@ -37,11 +37,11 @@ const getCategoryColor = (category: string) => {
 const getCategoryName = (category: string) => {
   switch (category.toLowerCase()) {
     case 'article':
-      return 'Bài viết';
+      return 'Articles';
     case 'event':
-      return 'Sự kiện';
+      return 'Events';
     case 'news':
-      return 'Tin tức';
+      return 'News';
     default:
       return category;
   }
@@ -126,11 +126,11 @@ export default function NewsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [totalArticles, setTotalArticles] = useState(0);
 
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 50;  // Load 50 food articles
 
   const categories = [
-    { key: 'all', label: 'Tất cả' },
-    { key: 'news', label: 'Tin tức' },
+    { key: 'all', label: 'All' },
+    { key: 'news', label: 'News' },
   ];
 
   useEffect(() => {
@@ -175,15 +175,15 @@ export default function NewsScreen() {
       setCurrentPage(page);
       
       if (!append && fallbackResponse.articles.length === 0) {
-        Alert.alert('Thông báo', 'Không có tin tức. Vui lòng thử lại sau.');
+        Alert.alert('Notice', 'No news available. Please try again later.');
       }
     } catch (error: any) {
       console.error('Error loading articles:', error);
       if (!append) {
         Alert.alert(
-          'Lỗi',
-          'Không thể tải tin tức. Kiểm tra kết nối mạng và backend server.',
-          [{ text: 'Thử lại', onPress: () => loadArticles() }, { text: 'Đóng' }]
+          'Error',
+          'Unable to load news. Check network connection and backend server.',
+          [{ text: 'Retry', onPress: () => loadArticles() }, { text: 'Close' }]
         );
       }
     } finally {
@@ -225,11 +225,29 @@ export default function NewsScreen() {
   };
 
   const renderFooter = () => {
-    if (!loadingMore) return null;
+    if (articles.length === 0) return null;
+    
     return (
-      <View style={styles.loadMoreContainer}>
-        <ActivityIndicator size="small" color="#2D6A4F" />
-        <Text style={styles.loadMoreText}>Đang tải thêm...</Text>
+      <View style={styles.footerContainer}>
+        {loadingMore ? (
+          <View style={styles.loadMoreContainer}>
+            <ActivityIndicator size="small" color="#2D6A4F" />
+            <Text style={styles.loadMoreText}>Loading more...</Text>
+          </View>
+        ) : hasMore ? (
+          <TouchableOpacity style={styles.loadMoreButton} onPress={loadMoreArticles}>
+            <Text style={styles.loadMoreButtonText}>Load more articles</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.endText}>Showing all {articles.length} articles</Text>
+        )}
+        
+        {/* Pagination info */}
+        <View style={styles.paginationInfo}>
+          <Text style={styles.paginationText}>
+            Page {currentPage} • {articles.length}/{totalArticles} articles
+          </Text>
+        </View>
       </View>
     );
   };
@@ -241,7 +259,7 @@ export default function NewsScreen() {
         <View style={styles.featuredSection}>
           <View style={styles.sectionHeader}>
             <Star size={18} color="#FF6B35" />
-            <Text style={styles.sectionTitle}>Nổi bật</Text>
+            <Text style={styles.sectionTitle}>Featured</Text>
           </View>
           <ScrollView 
             horizontal 
@@ -263,10 +281,10 @@ export default function NewsScreen() {
       <View style={styles.articlesSection}>
         <View style={styles.articlesSectionHeader}>
           <Text style={styles.sectionTitle}>
-            {selectedCategory === 'all' ? 'Tất cả bài viết' : categories.find(c => c.key === selectedCategory)?.label}
+            {selectedCategory === 'all' ? 'All Articles' : categories.find(c => c.key === selectedCategory)?.label}
           </Text>
           {totalArticles > 0 && (
-            <Text style={styles.totalCount}>({totalArticles} bài)</Text>
+            <Text style={styles.totalCount}>({totalArticles} articles)</Text>
           )}
         </View>
       </View>
@@ -276,7 +294,7 @@ export default function NewsScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Newspaper size={48} color="#95A99C" />
-      <Text style={styles.emptyText}>Chưa có bài viết nào</Text>
+      <Text style={styles.emptyText}>No articles yet</Text>
     </View>
   );
 
@@ -285,9 +303,9 @@ export default function NewsScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Newspaper size={28} color="#2D6A4F" />
-          <Text style={styles.headerTitle}>Tin Tức & Sự Kiện</Text>
+          <Text style={styles.headerTitle}>News & Events</Text>
         </View>
-        <Text style={styles.headerSubtitle}>Cập nhật thông tin ẩm thực mới nhất</Text>
+        <Text style={styles.headerSubtitle}>Latest food information updates</Text>
       </View>
 
       {/* Category Filter */}
@@ -318,7 +336,7 @@ export default function NewsScreen() {
       {loading ? (
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color="#2D6A4F" />
-          <Text style={styles.loadingText}>Đang tải tin tức...</Text>
+          <Text style={styles.loadingText}>Loading news...</Text>
         </View>
       ) : (
         <FlatList
@@ -580,5 +598,37 @@ const styles = StyleSheet.create({
   loadMoreText: {
     fontSize: 14,
     color: '#2D6A4F',
+  },
+  footerContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    backgroundColor: '#2D6A4F',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginBottom: 12,
+  },
+  loadMoreButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  endText: {
+    fontSize: 14,
+    color: '#95A99C',
+    fontStyle: 'italic',
+  },
+  paginationInfo: {
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8F5E9',
+  },
+  paginationText: {
+    fontSize: 13,
+    color: '#95A99C',
   },
 });
