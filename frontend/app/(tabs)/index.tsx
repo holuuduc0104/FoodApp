@@ -55,7 +55,7 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>My Ingredients</Text>
             <View style={styles.badge}>
@@ -82,7 +82,7 @@ export default function HomeScreen() {
               <Text style={styles.emptySubtext}>Add ingredients to get meal recommendations</Text>
             </View>
           )}
-        </View>
+        </View> */}
 
         {/* Add Ingredient Buttons */}
         <View style={styles.actionsSection}>
